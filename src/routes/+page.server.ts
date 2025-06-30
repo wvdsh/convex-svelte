@@ -5,7 +5,11 @@ import { api } from '../convex/_generated/api.js';
 
 export const load = (async () => {
 	const client = new ConvexHttpClient(PUBLIC_CONVEX_URL!);
+	const messagesResult = await client.query(api.messages.list, { 
+		paginationOpts: { numItems: 50, cursor: null },
+		muteWords: [] 
+	});
 	return {
-		messages: await client.query(api.messages.list, { muteWords: [] })
+		messagesResult: messagesResult
 	};
 }) satisfies PageServerLoad;

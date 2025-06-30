@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { useQuery, useConvexClient } from '$lib/client.svelte.js';
+	import { usePaginatedQuery, useConvexClient } from '$lib/client.svelte.js';
 	import type { Doc } from '../convex/_generated/dataModel.js';
 	import { api } from '../convex/_generated/api.js';
+	import type { PaginationResult } from 'convex/server';
 
-	const { initialMessages = [] as Doc<'messages'>[] } = $props();
+	const { initialMessages } = $props<{ initialMessages?: PaginationResult<Doc<'messages'>> }>();
 
 	let useStale = $state(true);
 	let muteWordsString = $state('');
@@ -16,11 +17,13 @@
 	let toSend = $state('');
 	let author = $state('me');
 
-	const messages = useQuery(
+	// Use the paginated query hook
+	const messagesQuery = usePaginatedQuery(
 		api.messages.list,
-		() => ({ muteWords: muteWords }),
-		() => ({ initialData: initialMessages, keepPreviousData: useStale })
+		() => ({ muteWords }),
+		{ initialNumItems: 50, initialData: initialMessages }
 	);
+
 
 	const client = useConvexClient();
 
@@ -36,6 +39,7 @@
 	function formatDate(ts: number) {
 		return new Date(ts).toLocaleString();
 	}
+
 </script>
 
 <div class="chat">
@@ -57,14 +61,14 @@
 		<button type="submit" disabled={!toSend}>Send</button>
 	</form>
 
-	{#if messages.isLoading}
+	{#if messagesQuery.status === 'LoadingFirstPage'}
 		Loading...
-	{:else if messages.error}
+	{:else if messagesQuery.error}
 		failed to load
-	{:else}
-		<ul class="messages" class:stale={messages.isStale}>
+	{:else if messagesQuery.results}
+		<ul class="messages">
 			<ul>
-				{#each messages.data as message}
+				{#each messagesQuery.results as message}
 					<li>
 						<span>{message.author}</span>
 						<span>{message.body}</span>
@@ -73,6 +77,15 @@
 				{/each}
 			</ul>
 		</ul>
+		{#if messagesQuery.status === 'CanLoadMore'}
+			<button onclick={() => messagesQuery.loadMore(50)}>
+				Load More
+			</button>
+		{:else if messagesQuery.status === 'LoadingMore'}
+			<button disabled>Loading...</button>
+		{:else if messagesQuery.status === 'Exhausted' && messagesQuery.results.length > 0}
+			<p>No more messages</p>
+		{/if}
 	{/if}
 </div>
 

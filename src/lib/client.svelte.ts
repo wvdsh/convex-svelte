@@ -4,10 +4,14 @@ import {
 	type FunctionReference,
 	type FunctionArgs,
 	type FunctionReturnType,
-	getFunctionName
+	getFunctionName,
+	type PaginationOptions,
+	type PaginationResult,
+	type BetterOmit
 } from 'convex/server';
 import { convexToJson, type Value } from 'convex/values';
 import { BROWSER } from 'esm-env';
+import { isEqual } from 'lodash-es';
 
 const _contextKey = '$$_convexClient';
 
@@ -211,4 +215,154 @@ function parseOptions<Query extends FunctionReference<'query'>>(
 		options = options();
 	}
 	return $state.snapshot(options);
+}
+
+
+
+
+
+// Type constraint for paginated queries
+type PaginatedQuery = FunctionReference<'query', 'public', { paginationOpts: PaginationOptions }, PaginationResult<any>>;
+
+export type PaginatedQueryItem<Query extends PaginatedQuery> =
+  FunctionReturnType<Query>["page"][number];
+
+type UsePaginatedQueryOptions<Query extends PaginatedQuery> = {
+	initialNumItems?: number;
+	initialData?: PaginationResult<FunctionReturnType<Query>>;
+};
+
+export type PaginatedQueryArgs<Query extends PaginatedQuery> = Expand<
+  BetterOmit<FunctionArgs<Query>, "paginationOpts">>
+
+enum UsePaginationQueryStatus {
+	LoadingFirstPage = 'LoadingFirstPage',
+	CanLoadMore = 'CanLoadMore',
+	LoadingMore = 'LoadingMore',
+	Exhausted = 'Exhausted'
+}
+
+type UsePaginatedQueryReturn<Item> = {
+	results: Item[] | undefined;
+	status: UsePaginationQueryStatus;
+	loadMore: (numItems: number) => void;
+	error: Error | undefined;
+};
+
+/**
+ * Subscribe to a paginated Convex query and return reactive paginated results.
+ * Automatically handles cursor management and provides a loadMore function.
+ *
+ * @param query - a FunctionReference that returns PaginationResult.
+ * @param args - The arguments to the query function (excluding paginationOpts).
+ * @param options - Options like initialNumItems.
+ * @returns an object containing results, status, loadMore function, isLoading, and error.
+ */
+export function usePaginatedQuery<
+	Query extends PaginatedQuery
+>(
+	query: Query,
+	args: PaginatedQueryArgs<Query> | (() => PaginatedQueryArgs<Query>),
+	options: UsePaginatedQueryOptions<Query> = {}
+): UsePaginatedQueryReturn<PaginatedQueryItem<Query>> {
+	const { initialNumItems = 10, initialData } = options;
+	const client = useConvexClient();
+
+	let nextCursor = $state(initialData ? initialData.continueCursor : null);
+	const pages = $state<PaginationResult<PaginatedQueryItem<Query>>[]>(initialData ? [initialData] : []);
+	const pagesLoading = $state<Record<string, boolean>>({
+		"initial": initialData ? false : true,
+	});
+	let isDone = $state(initialData && initialData.isDone ? true : false);
+	let error = $state<Error | undefined>(undefined);
+
+	// Track all active subscriptions
+	const subscriptions = new Map<string, () => void>();
+
+	function subscribeToPage(cursor: string | null) {
+		const pageKey = cursor ?? 'initial';
+		// we already handled the status for the first one
+		if (cursor) {
+			pagesLoading[pageKey] = true;
+		}
+		
+		const unsubscribe = client.onUpdate(
+			query,
+			{ paginationOpts: { numItems: initialNumItems, cursor } },
+			(dataFromServer) => {
+				pagesLoading[pageKey] = false;
+				const pageIndex = pages.findIndex(page => page.continueCursor === dataFromServer.continueCursor);
+
+				if (pageIndex === -1) {
+					pages.push(dataFromServer);
+				} else {
+					// Only update if the data actually changed
+					const existingPage = pages[pageIndex];
+					if (!isEqual(existingPage, dataFromServer)) {
+						pages[pageIndex] = dataFromServer;
+					}
+				}
+				nextCursor = dataFromServer.continueCursor;
+				isDone = dataFromServer.isDone;
+			},
+			(e: Error) => {
+				console.log(`error: `, e);
+				error = e;
+			}
+		);
+
+		subscriptions.set(pageKey, unsubscribe);
+		return unsubscribe;
+	}
+
+	// Subscribe to initial page
+	subscribeToPage(null);
+
+	// Cleanup all subscriptions on unmount
+	$effect(() => {
+		return () => {
+			subscriptions.forEach(unsubscribe => unsubscribe());
+			subscriptions.clear();
+		};
+	});
+
+	// Load more function
+	const loadMore = () => {
+		subscribeToPage(nextCursor);
+	};
+
+	// Determine status
+	const status = $derived.by(() => {
+		if (pagesLoading["initial"]) {
+			return UsePaginationQueryStatus.LoadingFirstPage;
+		}
+
+		const atLeastOnePageLoaded = Object.values(pagesLoading).some(loading => loading);
+		if (atLeastOnePageLoaded) {
+			return UsePaginationQueryStatus.LoadingMore;
+		}
+
+		if (isDone) {
+			return UsePaginationQueryStatus.Exhausted;
+		}
+
+		return UsePaginationQueryStatus.CanLoadMore;
+
+	});
+
+	// Derive results before the return statement
+	const results = $derived(pages.flatMap(page => page.page));
+
+	return {
+		get results() {
+			return results;
+		},
+		loadMore,
+		get status() {
+			return status;
+		},
+		get error() {
+			return error;
+		},
+	};
 }

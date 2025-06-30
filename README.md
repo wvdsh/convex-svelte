@@ -4,6 +4,20 @@
 
 # convex-svelte
 
+## Fork Features
+
+This fork extends the original `convex-svelte` library with the following features:
+
+### Pagination Support
+- **`usePaginatedQuery()`** - A new hook for handling paginated Convex queries with automatic cursor management
+- Provides reactive pagination state with `results`, `status`, `loadMore()`, and `error` properties
+- Supports initial data for SSR scenarios
+- Automatically manages multiple page subscriptions and updates
+
+---
+
+## Original convex-svelte
+
 Receive live updates to Convex query subscriptions and call mutations and actions from Svelte with `convex-svelte`.
 
 To install:

@@ -12,7 +12,7 @@
 <section>
 	<h1>Welcome to SvelteKit with Convex</h1>
 
-	<Chat initialMessages={data.messages} />
+	<Chat initialMessages={data.messagesResult} />
 </section>
 
 <style>
