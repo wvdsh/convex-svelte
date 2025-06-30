@@ -265,6 +265,7 @@ export function usePaginatedQuery<
 	args: PaginatedQueryArgs<Query> | (() => PaginatedQueryArgs<Query>),
 	options: UsePaginatedQueryOptions<Query> = {}
 ): UsePaginatedQueryReturn<PaginatedQueryItem<Query>> {
+
 	const { initialNumItems = 10, initialData } = options;
 	const client = useConvexClient();
 
@@ -279,7 +280,7 @@ export function usePaginatedQuery<
 	// Track all active subscriptions
 	const subscriptions = new Map<string, () => void>();
 
-	function subscribeToPage(cursor: string | null) {
+	function subscribeToPage(cursor: string | null, args: Record<string, Value>) {
 		const pageKey = cursor ?? 'initial';
 		// we already handled the status for the first one
 		if (cursor) {
@@ -288,7 +289,7 @@ export function usePaginatedQuery<
 		
 		const unsubscribe = client.onUpdate(
 			query,
-			{ ...parseArgs(args), paginationOpts: { numItems: initialNumItems, cursor } },
+			{ ...args, paginationOpts: { numItems: initialNumItems, cursor } },
 			(dataFromServer) => {
 				pagesLoading[pageKey] = false;
 				const pageIndex = pages.findIndex(page => page.continueCursor === dataFromServer.continueCursor);
@@ -315,11 +316,44 @@ export function usePaginatedQuery<
 		return unsubscribe;
 	}
 
-	// Subscribe to initial page
-	subscribeToPage(null);
+	// Track if this is the first render with initial args
+	let isFirstRender = true;
 
-	// Cleanup all subscriptions on unmount
+	// Watch for args changes and re-subscribe
 	$effect(() => {
+		// Parse args reactively to trigger effect on changes
+		const argsObject = parseArgs(args);
+
+		untrack(() => {
+			// Clear existing subscriptions
+			subscriptions.forEach(unsubscribe => unsubscribe());
+			subscriptions.clear();
+
+			// Reset state
+			if (isFirstRender && initialData) {
+				// Only use initialData on first render
+				nextCursor = initialData.continueCursor;
+				pages.length = 0;
+				pages.push(initialData);
+				Object.keys(pagesLoading).forEach(key => delete pagesLoading[key]);
+				pagesLoading["initial"] = false;
+				isDone = initialData.isDone;
+			} else {
+				// For subsequent renders or when args change, ignore initialData
+				nextCursor = null;
+				pages.length = 0;
+				Object.keys(pagesLoading).forEach(key => delete pagesLoading[key]);
+				pagesLoading["initial"] = true;
+				isDone = false;
+			}
+			error = undefined;
+			isFirstRender = false;
+
+			// Subscribe to initial page with new args
+			subscribeToPage(null, argsObject);
+		})
+		
+		// Cleanup on unmount
 		return () => {
 			subscriptions.forEach(unsubscribe => unsubscribe());
 			subscriptions.clear();
@@ -328,7 +362,7 @@ export function usePaginatedQuery<
 
 	// Load more function
 	const loadMore = () => {
-		subscribeToPage(nextCursor);
+		subscribeToPage(nextCursor, parseArgs(args));
 	};
 
 	// Determine status
