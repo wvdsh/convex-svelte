@@ -288,7 +288,7 @@ export function usePaginatedQuery<
 		
 		const unsubscribe = client.onUpdate(
 			query,
-			{ paginationOpts: { numItems: initialNumItems, cursor } },
+			{ ...parseArgs(args), paginationOpts: { numItems: initialNumItems, cursor } },
 			(dataFromServer) => {
 				pagesLoading[pageKey] = false;
 				const pageIndex = pages.findIndex(page => page.continueCursor === dataFromServer.continueCursor);
