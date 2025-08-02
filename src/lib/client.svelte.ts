@@ -45,6 +45,8 @@ type UseQueryOptions<Query extends FunctionReference<'query'>> = {
 	initialData?: FunctionReturnType<Query>;
 	// Instead of loading, render result from outdated args
 	keepPreviousData?: boolean;
+	// Whether the query should be enabled (defaults to true)
+	enabled?: boolean | (() => boolean);
 };
 
 type UseQueryReturn<Query extends FunctionReference<'query'>> =
@@ -59,13 +61,13 @@ type UseQueryReturn<Query extends FunctionReference<'query'>> =
  *
  * @param query - a FunctionRefernece like `api.dir1.dir2.filename.func`.
  * @param args - The arguments to the query function.
- * @param options - UseQueryOptions like `initialData` and `keepPreviousData`.
+ * @param options - UseQueryOptions like `initialData`, `keepPreviousData`, and `enabled` (can be boolean or function).
  * @returns an object containing data, isLoading, error, and isStale.
  */
 export function useQuery<Query extends FunctionReference<'query'>>(
 	query: Query,
 	args: FunctionArgs<Query> | (() => FunctionArgs<Query>),
-	options: UseQueryOptions<Query> | (() => UseQueryOptions<Query>) = {}
+	options: UseQueryOptions<Query> | (() => UseQueryOptions<Query>) = {},
 ): UseQueryReturn<Query> {
 	const client = useConvexClient();
 	if (typeof query === 'string') {
@@ -90,25 +92,33 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	// to the new one.
 	$effect(() => {
 		const argsObject = parseArgs(args);
-		const unsubscribe = client.onUpdate(
-			query,
-			argsObject,
-			(dataFromServer) => {
-				const copy = structuredClone(dataFromServer);
+		const opts = parseOptions(options);
+		
+		// Only subscribe if enabled (defaults to true)
+		if (opts.enabled) {
+			const unsubscribe = client.onUpdate(
+				query,
+				argsObject,
+				(dataFromServer) => {
+					const copy = structuredClone(dataFromServer);
 
-				state.result = copy;
-				state.argsForLastResult = argsObject;
-				state.lastResult = copy;
-			},
-			(e: Error) => {
-				state.result = e;
-				state.argsForLastResult = argsObject;
-				// is it important to copy the error here?
-				const copy = structuredClone(e);
-				state.lastResult = copy;
-			}
-		);
-		return unsubscribe;
+					state.result = copy;
+					state.argsForLastResult = argsObject;
+					state.lastResult = copy;
+				},
+				(e: Error) => {
+					state.result = e;
+					state.argsForLastResult = argsObject;
+					// is it important to copy the error here?
+					const copy = structuredClone(e);
+					state.lastResult = copy;
+				}
+			);
+			return unsubscribe;
+		}
+		
+		// Return no-op cleanup when disabled
+		return () => {};
 	});
 
 	// Are the args (the query key) the same as the last args we received a result for?
@@ -186,6 +196,8 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 			return data;
 		},
 		get isLoading() {
+			const opts = parseOptions(options);
+			if (!opts.enabled) return false;
 			return error === undefined && data === undefined;
 		},
 		get error() {
@@ -210,16 +222,25 @@ function parseArgs(
 // options can be an object or a closure
 function parseOptions<Query extends FunctionReference<'query'>>(
 	options: UseQueryOptions<Query> | (() => UseQueryOptions<Query>)
-): UseQueryOptions<Query> {
+): Omit<UseQueryOptions<Query>, 'enabled'> & { enabled: boolean } {
 	if (typeof options === 'function') {
 		options = options();
 	}
-	return $state.snapshot(options);
+
+	// Resolve enabled to boolean and create clean object for snapshot
+	const resolvedEnabled = options.enabled !== undefined 
+		? (typeof options.enabled === 'function' ? options.enabled() : options.enabled)
+		: true;
+
+	// Create a new object with only cloneable properties
+	const cleanOptions = {
+		initialData: options.initialData,
+		keepPreviousData: options.keepPreviousData,
+		enabled: resolvedEnabled
+	};
+
+	return $state.snapshot(cleanOptions);
 }
-
-
-
-
 
 // Type constraint for paginated queries
 type PaginatedQuery = FunctionReference<'query', 'public', { paginationOpts: PaginationOptions }, PaginationResult<any>>;
