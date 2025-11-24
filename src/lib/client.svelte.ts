@@ -1,4 +1,5 @@
 import { getContext, setContext, untrack } from 'svelte';
+import { BROWSER } from 'esm-env';
 import { ConvexClient, type ConvexClientOptions } from 'convex/browser';
 import {
 	type FunctionReference,
@@ -7,7 +8,7 @@ import {
 	getFunctionName
 } from 'convex/server';
 import { convexToJson, type Value } from 'convex/values';
-import { BROWSER } from 'esm-env';
+import { parseArgs, SKIP, type Skip } from './internal/args.svelte.js';
 
 const _contextKey = '$$_convexClient';
 
@@ -36,9 +37,6 @@ export const setupConvex = (url: string, options: ConvexClientOptions = {}) => {
 	$effect(() => () => client.close());
 };
 
-// Internal sentinel for "skip" so we don't pass the literal string through everywhere
-const SKIP = Symbol('convex.useQuery.skip');
-type Skip = typeof SKIP;
 
 type UseQueryOptions<Query extends FunctionReference<'query'>> = {
 	// Use this data and assume it is up to date (typically for SSR and hydration)
@@ -233,18 +231,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	} as UseQueryReturn<Query>;
 }
 
-/**
- *  args can be an object, "skip", or a closure returning either 
- **/
-function parseArgs(
-	args: Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
-): Record<string, Value> | Skip {
-	if (typeof args === 'function') {
-		args = args();
-	}
-	if (args === 'skip') return SKIP;
-	return $state.snapshot(args);
-}
+
 
 // options can be an object or a closure
 function parseOptions<Query extends FunctionReference<'query'>>(
