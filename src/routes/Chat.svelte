@@ -20,8 +20,12 @@
 
 	const messages = useQuery(
 		api.messages.list,
-		() => (skipQuery ? 'skip' : { muteWords: muteWords }),
-		() => ({ initialData: initialMessages, keepPreviousData: useStale })
+		() =>
+			skipQuery ? 'skip' : { muteWords: muteWords, paginationOpts: { numItems: 3, cursor: null } },
+		() => ({
+			initialData: { page: initialMessages, isDone: true, continueCursor: '' },
+			keepPreviousData: useStale
+		})
 	);
 
 	const client = useConvexClient();
@@ -70,7 +74,7 @@
 	{:else}
 		<ul class="messages" class:stale={messages.isStale}>
 			<ul>
-				{#each messages.data as message}
+				{#each messages.data.page as message}
 					<li>
 						<span>{message.author}</span>
 						<span>{message.body}</span>

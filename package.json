@@ -43,7 +43,7 @@
 		}
 	},
 	"peerDependencies": {
-		"convex": "^1.10.0",
+		"convex": "file:node_modules_local/convex-1.29.3.tgz",
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
@@ -54,7 +54,7 @@
 		"@sveltejs/vite-plugin-svelte": "^4.0.4",
 		"@types/eslint": "^9.6.1",
 		"@types/node": "^22.17.1",
-		"convex": "^1.25.4",
+		"convex": "file:node_modules_local/convex-1.29.3.tgz",
 		"eslint": "^9.33.0",
 		"eslint-config-prettier": "^9.1.2",
 		"eslint-plugin-svelte": "^2.46.1",

@@ -6,12 +6,23 @@ export const error = query(() => {
 	throw new ConvexError('this is a Convex error');
 });
 
-export const list = query(async (ctx, { muteWords = [] }: { muteWords?: string[] }) => {
-	const messages = await ctx.db.query('messages').collect();
-	const filteredMessages = messages.filter(
-		({ body }) => !muteWords.some((word) => body.toLowerCase().includes(word.toLowerCase()))
-	);
-	return filteredMessages.reverse();
+export const list = query({
+	args: {
+		muteWords: v.array(v.string()),
+		paginationOpts: paginationOptsValidator
+	},
+	handler: async (ctx, { muteWords = [], paginationOpts }) => {
+		const results = await ctx.db.query('messages').paginate(paginationOpts);
+		const page = results.page.filter(
+			({ body }) => !muteWords.some((word) => body.toLowerCase().includes(word.toLowerCase()))
+		);
+
+		page.reverse();
+		return {
+			...results,
+			page
+		};
+	}
 });
 
 export const send = mutation({
@@ -23,6 +34,7 @@ export const send = mutation({
 });
 
 import seedMessages from './seed_messages.js';
+import { paginationOptsValidator } from 'convex/server';
 export const seed = internalMutation({
 	handler: async (ctx) => {
 		if ((await ctx.db.query('messages').collect()).length >= seedMessages.length) return;
