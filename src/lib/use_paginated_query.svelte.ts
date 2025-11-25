@@ -1,9 +1,10 @@
-// src/lib/use_paginated_query.svelte.ts (or wherever you keep it)
 import type { PaginationStatus } from 'convex/browser';
 import type { FunctionArgs, FunctionReference } from 'convex/server';
 import type { Value } from 'convex/values';
 import { useConvexClient } from './client.svelte.js';
-import { parseArgs, SKIP } from './internal/args.svelte.js';
+import { argsKeyEqual, SKIP } from './shared/args.svelte.js';
+import { parseArgsWithSkip } from './internal/args.svelte.js';
+import type { UsePaginatedQueryOptions, UsePaginatedQueryReturn } from './shared/types.js';
 
 // --- Pagination helpers & types ---------------------------------------------
 
@@ -17,41 +18,26 @@ type PageItem<Query extends FunctionReference<'query'>> = Query['_returnType'] e
 	? Item
 	: never;
 
-export type UsePaginatedQueryOptions<Query extends FunctionReference<'query'>> = {
-	/**
-	 * How many items to load in the first page.
-	 */
-	initialNumItems: number;
-	/**
-	 * Optional initial data for hydration/SSR.
-	 * This must be the full paginated return shape:
-	 *   { page: Item[]; isDone: boolean; continueCursor: string }
-	 */
-	initialData?: Query['_returnType'];
-};
+export type SveltePaginatedQueryOptions<Query extends FunctionReference<'query'>> =
+	UsePaginatedQueryOptions & {
+		/**
+		 * Optional initial data for hydration/SSR.
+		 * This must be the full paginated return shape:
+		 *   { page: Item[]; isDone: boolean; continueCursor: string }
+		 */
+		initialData?: Query['_returnType'];
+		/**
+		 * Instead of clearing results when args change, keep previous page
+		 * while loading the new one.
+		 */
+		keepPreviousData?: boolean;
+	};
 
-export type UsePaginatedQueryReturn<Query extends FunctionReference<'query'>> = {
-	results: PageItem<Query>[];
-	status: PaginationStatus;
-	isLoading: boolean;
-	error: Error | undefined;
-	loadMore: (numItems: number) => boolean;
-};
+export type SveltePaginatedQueryReturn<Query extends FunctionReference<'query'>> =
+	UsePaginatedQueryReturn<Query> & {
+		error: Error | undefined;
+	};
 
-/**
- * Load data reactively from a paginated query to create a growing list.
- *
- * Mirrors the React `usePaginatedQuery` API:
- *   const messages = usePaginatedQuery(api.messages.list, { channel: '#general' }, { initialNumItems: 5 });
- *
- * - `query` must be a paginated Convex query (returns `{ page, isDone, continueCursor }`).
- * - `args` is the query args **without** `paginationOpts`. Pagination is handled internally.
- * - `options.initialNumItems` controls the first page size.
- * - `options.initialData` seeds the initial page + status (useful for SSR/hydration).
- *
- * Supports `"skip"` just like `useQuery`:
- *   usePaginatedQuery(api.list, () => (authed ? { ... } : 'skip'), { initialNumItems: 10 })
- */
 export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 	query: Query,
 	args:
@@ -60,24 +46,30 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		| (() => WithoutPaginationOpts<FunctionArgs<Query>> | 'skip') = {} as WithoutPaginationOpts<
 		FunctionArgs<Query>
 	>,
-	options: UsePaginatedQueryOptions<Query> | (() => UsePaginatedQueryOptions<Query>)
-): UsePaginatedQueryReturn<Query> {
+	options: SveltePaginatedQueryOptions<Query> | (() => SveltePaginatedQueryOptions<Query>)
+): SveltePaginatedQueryReturn<Query> {
 	const client = useConvexClient();
 	if (typeof query === 'string') {
 		throw new Error('Query must be a functionReference object, not a string');
 	}
 
-	// Use options once to seed initial state (like useQuery does with initialData)
+	// Seed from options (like useQuery)
 	const initialOpts = parsePaginatedOptions<Query>(options);
-	const initialResults = initialOpts.initialData
-		? ((initialOpts.initialData as any).page as PageItem<Query>[])
+	const hasInitialData = initialOpts.initialData !== undefined;
+
+	const initialResults = hasInitialData
+		? (initialOpts.initialData?.page as PageItem<Query>[])
 		: ([] as PageItem<Query>[]);
-	const initialStatus: PaginationStatus = initialOpts.initialData
-		? (initialOpts.initialData as any).isDone
+	const initialStatus: PaginationStatus = hasInitialData
+		? initialOpts.initialData?.isDone
 			? 'Exhausted'
 			: 'CanLoadMore'
 		: 'LoadingFirstPage';
-	const initialIsLoading = !initialOpts.initialData;
+	const initialIsLoading = !hasInitialData;
+
+	const initialArgs = parseArgsWithSkip(
+		args as Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
+	);
 
 	const state = $state<{
 		results: PageItem<Query>[];
@@ -85,31 +77,42 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		isLoading: boolean;
 		error: Error | undefined;
 		loadMore: (numItems: number) => boolean;
-		// used to trigger a reset when we hit InvalidCursor
 		resetKey: number;
+		haveArgsEverChanged: boolean;
 	}>({
 		results: initialResults,
 		status: initialStatus,
 		isLoading: initialIsLoading,
 		error: undefined,
 		loadMore: () => false,
-		resetKey: 0
+		resetKey: 0,
+		haveArgsEverChanged: false
 	});
 
+	function computeIsLoading(status: PaginationStatus): boolean {
+		// While we’re still on initial args + have initialData, keep isLoading=false
+		if (hasInitialData && !state.haveArgsEverChanged) {
+			return false;
+		}
+		return status === 'LoadingFirstPage' || status === 'LoadingMore';
+	}
+
 	$effect(() => {
-		// make resetKey a dependency of this effect so we can force-reset pagination
 		const _resetKey = state.resetKey;
 
-		const argsObject = parseArgs(
+		const argsObject = parseArgsWithSkip(
 			args as Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
 		);
 		const opts = parsePaginatedOptions<Query>(options);
+		const keepPrevious = !!opts.keepPreviousData;
 
-		// SSR / disabled client: behave like "loading"
+		// Track when args change away from the initial key
+		if (!state.haveArgsEverChanged && !argsKeyEqual(initialArgs, argsObject)) {
+			state.haveArgsEverChanged = true;
+		}
+
 		if (client.disabled) {
-			state.results = [] as PageItem<Query>[];
-			state.status = 'LoadingFirstPage';
-			state.isLoading = true;
+			state.isLoading = !hasInitialData;
 			state.error = undefined;
 			state.loadMore = () => false;
 			return;
@@ -118,7 +121,6 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		const isSkipped = argsObject === SKIP;
 
 		if (isSkipped) {
-			// Like useQuery: skip => not loading, no error, empty results
 			state.results = [] as PageItem<Query>[];
 			state.status = 'LoadingFirstPage';
 			state.isLoading = false;
@@ -127,25 +129,36 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 			return;
 		}
 
-		// Subscribe to the paginated query.
+		const usingInitialData = hasInitialData && !state.haveArgsEverChanged;
+
 		const unsubscribe = client.onPaginatedUpdate_experimental(
 			query,
-			argsObject as any,
+			argsObject,
 			{ initialNumItems: opts.initialNumItems },
 			() => {
-				// Each time a page updates, read the aggregated result.
-				const current = (unsubscribe as any).getCurrentValue?.();
+				const current = unsubscribe.getCurrentValue?.();
 				if (!current) return;
+
+				// 🔑 While hydrating from initialData, ignore the first
+				// "empty loading" snapshot: keep SSR page visible.
+				if (
+					usingInitialData &&
+					Array.isArray(current.results) &&
+					current.results.length === 0 &&
+					current.status === 'LoadingFirstPage'
+				) {
+					state.loadMore = (numItems: number) => current.loadMore(numItems);
+					state.isLoading = false;
+					return;
+				}
 
 				state.results = current.results as PageItem<Query>[];
 				state.status = current.status;
-				state.isLoading = current.status === 'LoadingFirstPage' || current.status === 'LoadingMore';
-				// once we have a valid result, clear any previous error
+				state.isLoading = computeIsLoading(current.status);
 				state.error = undefined;
 				state.loadMore = (numItems: number) => current.loadMore(numItems);
 			},
 			(error: Error) => {
-				// Pagination-specific errors: reset; others: surface as .error
 				if (error.message.includes('InvalidCursor')) {
 					console.warn('usePaginatedQuery hit InvalidCursor, resetting pagination state:', error);
 					state.results = [] as PageItem<Query>[];
@@ -156,72 +169,79 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 					return;
 				}
 
-				// For non-pagination errors, keep last good results but expose .error
 				state.error = error;
 				state.isLoading = false;
 			}
 		);
 
-		// Initialize from any already-cached value from the paginated client.
-		const initial = (unsubscribe as any).getCurrentValue?.();
-		if (initial) {
-			state.results = initial.results as PageItem<Query>[];
-			state.status = initial.status;
-			state.isLoading = initial.status === 'LoadingFirstPage' || initial.status === 'LoadingMore';
+		const current = unsubscribe.getCurrentValue?.();
+
+		if (current) {
+			// Same hydration guard for the initial cached snapshot
+			if (
+				usingInitialData &&
+				Array.isArray(current.results) &&
+				current.results.length === 0 &&
+				current.status === 'LoadingFirstPage'
+			) {
+				state.loadMore = (numItems: number) => current.loadMore(numItems);
+				state.isLoading = false;
+			} else {
+				state.results = current.results as PageItem<Query>[];
+				state.status = current.status;
+				state.isLoading = computeIsLoading(current.status);
+				state.error = undefined;
+				state.loadMore = (numItems: number) => current.loadMore(numItems);
+			}
+		} else {
+			// No cached value yet
+			const shouldKeepPrevious = keepPrevious && state.results.length > 0;
+
+			if (!usingInitialData && !shouldKeepPrevious) {
+				state.results = [] as PageItem<Query>[];
+				state.status = 'LoadingFirstPage';
+			}
+			state.isLoading = usingInitialData ? false : true;
 			state.error = undefined;
-			state.loadMore = (numItems: number) => initial.loadMore(numItems);
-		} else if (!initialOpts.initialData) {
-			// Only override the seeded initialData state if we *didn't* have initialData
-			state.results = [] as PageItem<Query>[];
-			state.status = 'LoadingFirstPage';
-			state.isLoading = true;
-			state.error = undefined;
+
 			state.loadMore = (numItems: number) => {
-				const current = (unsubscribe as any).getCurrentValue?.();
-				if (!current) return false;
-				return current.loadMore(numItems);
+				const latest = unsubscribe.getCurrentValue?.();
+				if (!latest) return false;
+				return latest.loadMore(numItems);
 			};
 		}
 
-		// Cleanup on args / options change or component unmount.
 		return () => {
 			if (typeof unsubscribe === 'function') {
-				(unsubscribe as any)();
+				unsubscribe();
 			} else if ('unsubscribe' in (unsubscribe as any)) {
 				(unsubscribe as any).unsubscribe();
 			}
 		};
 	});
 
-	const results = $derived(state.results);
-	const status = $derived(state.status);
-	const isLoading = $derived(state.isLoading);
-	const error = $derived(state.error);
-
 	return {
 		get results() {
-			return results;
+			return state.results;
 		},
 		get status() {
-			return status;
+			return state.status;
 		},
 		get isLoading() {
-			return isLoading;
+			return state.isLoading;
 		},
 		get error() {
-			return error;
+			return state.error;
 		},
 		loadMore(numItems: number) {
 			return state.loadMore(numItems);
 		}
-	} as UsePaginatedQueryReturn<Query>;
+	} as SveltePaginatedQueryReturn<Query>;
 }
 
-// --- helpers ---------------------------------------------------------------
-
 function parsePaginatedOptions<Query extends FunctionReference<'query'>>(
-	options: UsePaginatedQueryOptions<Query> | (() => UsePaginatedQueryOptions<Query>)
-): UsePaginatedQueryOptions<Query> {
+	options: SveltePaginatedQueryOptions<Query> | (() => SveltePaginatedQueryOptions<Query>)
+): SveltePaginatedQueryOptions<Query> {
 	if (typeof options === 'function') {
 		options = options();
 	}

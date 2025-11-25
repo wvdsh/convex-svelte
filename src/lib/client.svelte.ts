@@ -7,8 +7,9 @@ import {
 	type FunctionReturnType,
 	getFunctionName
 } from 'convex/server';
-import { convexToJson, type Value } from 'convex/values';
-import { parseArgs, SKIP, type Skip } from './internal/args.svelte.js';
+import type { Value } from 'convex/values';
+import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.svelte.js';
+import { parseArgsWithSkip } from './internal/args.svelte.js';
 
 const _contextKey = '$$_convexClient';
 
@@ -36,7 +37,6 @@ export const setupConvex = (url: string, options: ConvexClientOptions = {}) => {
 	setConvexClientContext(client);
 	$effect(() => () => client.close());
 };
-
 
 type UseQueryOptions<Query extends FunctionReference<'query'>> = {
 	// Use this data and assume it is up to date (typically for SSR and hydration)
@@ -91,7 +91,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	// When args change we need to unsubscribe to the old query and subscribe
 	// to the new one.
 	$effect(() => {
-		const argsObject = parseArgs(args);
+		const argsObject = parseArgsWithSkip(args);
 
 		// If skipped, don't create any subscription
 		if (argsObject === SKIP) {
@@ -126,8 +126,8 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	 ** staleness & args tracking **
 	 * Are the args (the query key) the same as the last args we received a result for?
 	 */
-	const currentArgs = $derived(parseArgs(args));
-	const initialArgs = parseArgs(args);
+	const currentArgs = $derived(parseArgsWithSkip(args));
+	const initialArgs = parseArgsWithSkip(args);
 
 	const sameArgsAsLastResult = $derived(
 		state.argsForLastResult !== undefined &&
@@ -145,7 +145,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	// Once args change, move off of initialData.
 	$effect(() => {
 		if (!untrack(() => state.haveArgsEverChanged)) {
-			const curr = parseArgs(args);
+			const curr = parseArgsWithSkip(args);
 			if (!argsKeyEqual(initialArgs, curr)) {
 				state.haveArgsEverChanged = true;
 				const opts = parseOptions(options);
@@ -231,8 +231,6 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	} as UseQueryReturn<Query>;
 }
 
-
-
 // options can be an object or a closure
 function parseOptions<Query extends FunctionReference<'query'>>(
 	options: UseQueryOptions<Query> | (() => UseQueryOptions<Query>)
@@ -241,14 +239,4 @@ function parseOptions<Query extends FunctionReference<'query'>>(
 		options = options();
 	}
 	return $state.snapshot(options);
-}
-
-function jsonEqualArgs(a: Record<string, Value>, b: Record<string, Value>): boolean {
-	return JSON.stringify(convexToJson(a)) === JSON.stringify(convexToJson(b));
-}
-
-function argsKeyEqual(a: Record<string, Value> | Skip, b: Record<string, Value> | Skip): boolean {
-	if (a === SKIP && b === SKIP) return true;
-	if (a === SKIP || b === SKIP) return false;
-	return jsonEqualArgs(a, b);
 }

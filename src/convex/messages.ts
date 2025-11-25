@@ -6,7 +6,15 @@ export const error = query(() => {
 	throw new ConvexError('this is a Convex error');
 });
 
-export const list = query({
+export const list = query(async (ctx, { muteWords = [] }: { muteWords?: string[] }) => {
+	const messages = await ctx.db.query('messages').collect();
+	const filteredMessages = messages.filter(
+		({ body }) => !muteWords.some((word) => body.toLowerCase().includes(word.toLowerCase()))
+	);
+	return filteredMessages.reverse();
+});
+
+export const paginatedList = query({
 	args: {
 		muteWords: v.array(v.string()),
 		paginationOpts: paginationOptsValidator
@@ -17,7 +25,6 @@ export const list = query({
 			({ body }) => !muteWords.some((word) => body.toLowerCase().includes(word.toLowerCase()))
 		);
 
-		page.reverse();
 		return {
 			...results,
 			page

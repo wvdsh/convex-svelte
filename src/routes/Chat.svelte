@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { useQuery, useConvexClient } from '$lib/client.svelte.js';
-	import type { Doc } from '../convex/_generated/dataModel.js';
+	import { usePaginatedQuery, useConvexClient } from '$lib/index.js';
 	import { api } from '../convex/_generated/api.js';
+	import type { FunctionReturnType } from 'convex/server';
 
-	const { initialMessages = [] as Doc<'messages'>[] } = $props();
+	const {
+		initialMessages
+	}: { initialMessages: FunctionReturnType<typeof api.messages.paginatedList> } = $props();
 
 	let useStale = $state(true);
 	let muteWordsString = $state('');
@@ -18,12 +20,12 @@
 
 	let skipQuery = $state(false);
 
-	const messages = useQuery(
-		api.messages.list,
-		() =>
-			skipQuery ? 'skip' : { muteWords: muteWords, paginationOpts: { numItems: 3, cursor: null } },
+	const messages = usePaginatedQuery(
+		api.messages.paginatedList,
+		() => (skipQuery ? 'skip' : { muteWords: muteWords }),
 		() => ({
-			initialData: { page: initialMessages, isDone: true, continueCursor: '' },
+			initialNumItems: 3,
+			initialData: initialMessages,
 			keepPreviousData: useStale
 		})
 	);
@@ -72,9 +74,9 @@
 	{:else if messages.error}
 		failed to load {messages.error}
 	{:else}
-		<ul class="messages" class:stale={messages.isStale}>
+		<ul class="messages">
 			<ul>
-				{#each messages.data.page as message}
+				{#each messages.results as message}
 					<li>
 						<span>{message.author}</span>
 						<span>{message.body}</span>
@@ -83,6 +85,9 @@
 				{/each}
 			</ul>
 		</ul>
+		<button onclick={() => messages.loadMore(3)} disabled={messages.status !== 'CanLoadMore'}>
+			Load more
+		</button>
 	{/if}
 </div>
 
