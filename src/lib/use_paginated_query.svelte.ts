@@ -4,33 +4,19 @@ import type { Value } from 'convex/values';
 import { useConvexClient } from './client.svelte.js';
 import { SKIP } from './shared/args.svelte.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
-import type { UsePaginatedQueryOptions, UsePaginatedQueryReturn } from './shared/types.js';
+import type { PageItem, PaginatedReturnType, UsePaginatedQueryOptions, UsePaginatedQueryReturn, WithoutPaginationOpts } from './shared/types.js';
 import {
 	PaginatedQueryStateMachine,
 	serializeArgsKey,
 	type PaginatedQueryConfig
 } from './shared/paginated_query_state.js';
 
-// --- Pagination helpers & types ---------------------------------------------
-
-type WithoutPaginationOpts<Args> = Args extends { paginationOpts: any }
-	? Omit<Args, 'paginationOpts'> & { paginationOpts?: never }
-	: Args & { paginationOpts?: never };
-
-type PageItem<Query extends FunctionReference<'query'>> = Query['_returnType'] extends {
-	page: (infer Item)[];
-}
-	? Item
-	: never;
-
 export type SveltePaginatedQueryOptions<Query extends FunctionReference<'query'>> =
 	UsePaginatedQueryOptions & {
 		/**
 		 * Optional initial data for hydration/SSR.
-		 * This must be the full paginated return shape:
-		 *   { page: Item[]; isDone: boolean; continueCursor: string }
 		 */
-		initialData?: Query['_returnType'];
+		initialData?: PaginatedReturnType<PageItem<Query>>;
 		/**
 		 * Instead of clearing results when args change, keep previous page
 		 * while loading the new one.
@@ -81,7 +67,7 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 	// Create the framework-agnostic state machine
 	const machineConfig: PaginatedQueryConfig<PageItem<Query>> = {
 		initialNumItems: initialOpts.initialNumItems,
-		initialData: initialOpts.initialData as PaginatedQueryConfig<PageItem<Query>>['initialData'],
+		initialData: initialOpts.initialData,
 		keepPreviousData: initialOpts.keepPreviousData
 	};
 	const machine = new PaginatedQueryStateMachine<PageItem<Query>>(machineConfig);
@@ -99,16 +85,18 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		...machine.getSnapshot()
 	});
 
-	// Sync machine state to Svelte reactive state
-	function syncFromMachine() {
-		const snapshot = machine.getSnapshot();
-		state.results = snapshot.results;
-		state.status = snapshot.status;
-		state.isLoading = snapshot.isLoading;
-		state.error = snapshot.error;
-		state.loadMore = snapshot.loadMore;
-		state.resetKey = snapshot.resetKey;
-	}
+	// Subscribe to machine state changes and sync to Svelte reactive state
+	$effect(() => {
+		return machine.subscribe(() => {
+			const snapshot = machine.getSnapshot();
+			state.results = snapshot.results;
+			state.status = snapshot.status;
+			state.isLoading = snapshot.isLoading;
+			state.error = snapshot.error;
+			state.loadMore = snapshot.loadMore;
+			state.resetKey = snapshot.resetKey;
+		});
+	});
 
 	$effect(() => {
 		// Read resetKey to create reactive dependency - triggers re-run on InvalidCursor reset
@@ -122,9 +110,8 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 
 		// Notify machine of args change
 		const argsKey =
-			argsObject === SKIP ? null : serializeArgsKey(argsObject as Record<string, unknown>);
+			argsObject === SKIP ? null : serializeArgsKey(argsObject as Record<string, Value>);
 		machine.onArgsChange(argsKey);
-		syncFromMachine();
 
 		// Handle disabled client
 		if (client.disabled) {
@@ -136,12 +123,16 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 			return;
 		}
 
+		// Track if we've received data via callback to avoid duplicate processing
+		let hasReceivedUpdate = false;
+
 		// Create subscription to Convex paginated query
 		const unsubscribe = client.onPaginatedUpdate_experimental(
 			query,
 			argsObject,
 			{ initialNumItems: opts.initialNumItems },
 			() => {
+				hasReceivedUpdate = true;
 				const current = unsubscribe.getCurrentValue?.();
 				if (!current) return;
 
@@ -151,17 +142,17 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 					status: current.status,
 					loadMore: (numItems: number) => current.loadMore(numItems)
 				});
-				syncFromMachine();
 			},
 			(error: Error) => {
+				hasReceivedUpdate = true;
 				// Feed error to state machine (handles InvalidCursor detection)
 				machine.onError(error);
-				syncFromMachine();
 				// If InvalidCursor was detected, resetKey changed and effect will re-run
 			}
 		);
 
-		// Get initial cached value if available
+		// Get initial cached value if available (only if callback hasn't fired synchronously)
+		if (!hasReceivedUpdate) {
 		const current = unsubscribe.getCurrentValue?.();
 		if (current) {
 			machine.onUpdate({
@@ -169,16 +160,12 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 				status: current.status,
 				loadMore: (numItems: number) => current.loadMore(numItems)
 			});
-			syncFromMachine();
+			}
 		}
 
 		// Cleanup on unmount or re-run
 		return () => {
-			if (typeof unsubscribe === 'function') {
-				unsubscribe();
-			} else if ('unsubscribe' in (unsubscribe as any)) {
-				(unsubscribe as any).unsubscribe();
-			}
+			unsubscribe.unsubscribe();
 		};
 	});
 
@@ -213,5 +200,7 @@ function parsePaginatedOptions<Query extends FunctionReference<'query'>>(
 			`\`options.initialNumItems\` must be a positive number. Received \`${snapshot.initialNumItems}\`.`
 		);
 	}
-	return snapshot;
+	// Cast needed because $state.snapshot returns Snapshot<T>, but for plain
+	// Convex data the snapshot is structurally identical to the original type
+	return snapshot as SveltePaginatedQueryOptions<Query>;
 }

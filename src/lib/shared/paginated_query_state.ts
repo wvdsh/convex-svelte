@@ -1,4 +1,6 @@
 import type { PaginationStatus } from "convex/browser";
+import { convexToJson, type Value } from "convex/values";
+import type { PaginatedReturnType } from "./types.js";
 
 /**
  * Snapshot of paginated query state.
@@ -23,9 +25,8 @@ export type PaginatedQueryConfig<T> = {
 
   /**
    * Optional initial data for hydration/SSR.
-   * Must match the paginated return shape: { page: T[]; isDone: boolean; continueCursor: string }
    */
-  initialData?: { page: T[]; isDone: boolean; continueCursor: string };
+  initialData?: PaginatedReturnType<T>;
 
   /**
    * Instead of clearing results when args change, keep previous data while loading new.
@@ -379,8 +380,8 @@ export class PaginatedQueryStateMachine<T> {
  * @returns Serialized string or null
  */
 export function serializeArgsKey(
-  args: Record<string, unknown> | null
+  args: Record<string, Value> | null
 ): string | null {
   if (args === null) return null;
-  return JSON.stringify(args, Object.keys(args).sort());
+  return JSON.stringify(convexToJson(args));
 }

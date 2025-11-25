@@ -53,6 +53,22 @@ export type WithoutPaginationOpts<Args> = Args extends { paginationOpts: any }
   : Args & { paginationOpts?: never };
 
 /**
+ * The return shape of a Convex paginated query.
+ *
+ * Convex paginated queries return:
+ *   { page: T[]; isDone: boolean; continueCursor: string }
+ *
+ * This type is used for:
+ *   - `initialData` in paginated query options (SSR hydration)
+ *   - Type-safe validation of paginated query returns
+ */
+export type PaginatedReturnType<T> = {
+  page: T[];
+  isDone: boolean;
+  continueCursor: string;
+};
+
+/**
  * Extract the element type from a paginated query’s return type.
  *
  * Convex paginated queries return something like:
