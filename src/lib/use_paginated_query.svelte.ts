@@ -2,7 +2,7 @@ import type { PaginationStatus } from 'convex/browser';
 import type { FunctionArgs, FunctionReference } from 'convex/server';
 import type { Value } from 'convex/values';
 import { useConvexClient } from './client.svelte.js';
-import { SKIP } from './shared/args.svelte.js';
+import { SKIP } from './shared/args.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
 import type { PageItem, PaginatedReturnType, UsePaginatedQueryOptions, UsePaginatedQueryReturn, WithoutPaginationOpts } from './shared/types.js';
 import {

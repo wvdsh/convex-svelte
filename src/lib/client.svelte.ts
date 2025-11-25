@@ -8,7 +8,7 @@ import {
 	getFunctionName
 } from 'convex/server';
 import type { Value } from 'convex/values';
-import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.svelte.js';
+import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
 
 const _contextKey = '$$_convexClient';

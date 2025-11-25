@@ -1,4 +1,4 @@
-import { normalizeArgs, SKIP, type Skip } from '$lib/shared/args.svelte.js';
+import { normalizeArgs, SKIP, type Skip } from '$lib/shared/args.js';
 import type { MaybeSkipArgsOrFn } from '$lib/shared/types.js';
 import type { Value } from 'convex/values';
 
