@@ -4,13 +4,13 @@
   
   let skipQuery = $state(false);
   
-  // const messages = useQuery(
-  //   api.messages.list,
-  //   () => (skipQuery ? 'skip' : { muteWords: [] })
-  // );
+  const messages = useQuery(
+    api.messages.list,
+    () => (skipQuery ? 'skip' : { muteWords: [] })
+  );
 </script>
 
-<!-- <section>
+<section>
   <h1>Skip Query Test</h1>
   
   <label>
@@ -29,4 +29,4 @@
       <p data-testid="no-data">No data</p>
     {/if}
   </div>
-</section> -->
+</section>

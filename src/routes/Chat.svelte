@@ -102,10 +102,6 @@
 		width: 100%;
 	}
 
-	.stale {
-		color: rgba(0, 0, 0, 0.8);
-	}
-
 	ul {
 		display: flex;
 		flex-direction: column;

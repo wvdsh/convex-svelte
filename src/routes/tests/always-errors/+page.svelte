@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { useQuery, useConvexClient } from '$lib/client.svelte.js';
-	import type { Doc } from '../../../convex/_generated/dataModel.js';
+	import { useQuery } from '$lib/client.svelte.js';
 	import { api } from '../../../convex/_generated/api.js';
 
 	const foo = useQuery(api.messages.error, {});
