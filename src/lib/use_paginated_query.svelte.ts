@@ -2,9 +2,14 @@ import type { PaginationStatus } from 'convex/browser';
 import type { FunctionArgs, FunctionReference } from 'convex/server';
 import type { Value } from 'convex/values';
 import { useConvexClient } from './client.svelte.js';
-import { argsKeyEqual, SKIP } from './shared/args.svelte.js';
+import { SKIP } from './shared/args.svelte.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
 import type { UsePaginatedQueryOptions, UsePaginatedQueryReturn } from './shared/types.js';
+import {
+	PaginatedQueryStateMachine,
+	serializeArgsKey,
+	type PaginatedQueryConfig
+} from './shared/paginated_query_state.js';
 
 // --- Pagination helpers & types ---------------------------------------------
 
@@ -38,6 +43,23 @@ export type SveltePaginatedQueryReturn<Query extends FunctionReference<'query'>>
 		error: Error | undefined;
 	};
 
+/**
+ * Subscribe to a paginated Convex query with automatic cursor management.
+ *
+ * This hook uses an imperative state machine (`PaginatedQueryStateMachine`) to handle:
+ * - InvalidCursor error detection and automatic pagination reset
+ * - "keep previous data" vs "clear on args change" behavior
+ * - Initial data hydration for SSR
+ *
+ * The state machine is framework-agnostic and can be wrapped by React, Vue, Solid, etc.
+ * This Svelte hook adds only Svelte-specific reactivity on top.
+ *
+ * @param query - A FunctionReference to a paginated query
+ * @param args - Query arguments (without paginationOpts) or "skip"
+ * @param options - Configuration including initialNumItems
+ * @returns Reactive pagination state with results, status, loadMore, etc.
+ */
+
 export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 	query: Query,
 	args:
@@ -53,24 +75,19 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		throw new Error('Query must be a functionReference object, not a string');
 	}
 
-	// Seed from options (like useQuery)
+	// Parse initial options to create the state machine
 	const initialOpts = parsePaginatedOptions<Query>(options);
-	const hasInitialData = initialOpts.initialData !== undefined;
 
-	const initialResults = hasInitialData
-		? (initialOpts.initialData?.page as PageItem<Query>[])
-		: ([] as PageItem<Query>[]);
-	const initialStatus: PaginationStatus = hasInitialData
-		? initialOpts.initialData?.isDone
-			? 'Exhausted'
-			: 'CanLoadMore'
-		: 'LoadingFirstPage';
-	const initialIsLoading = !hasInitialData;
+	// Create the framework-agnostic state machine
+	const machineConfig: PaginatedQueryConfig<PageItem<Query>> = {
+		initialNumItems: initialOpts.initialNumItems,
+		initialData: initialOpts.initialData as PaginatedQueryConfig<PageItem<Query>>['initialData'],
+		keepPreviousData: initialOpts.keepPreviousData
+	};
+	const machine = new PaginatedQueryStateMachine<PageItem<Query>>(machineConfig);
 
-	const initialArgs = parseArgsWithSkip(
-		args as Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
-	);
-
+	// Svelte-specific: reactive state that mirrors machine state
+	// resetKey is tracked reactively to trigger effect re-runs on InvalidCursor
 	const state = $state<{
 		results: PageItem<Query>[];
 		status: PaginationStatus;
@@ -78,59 +95,48 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		error: Error | undefined;
 		loadMore: (numItems: number) => boolean;
 		resetKey: number;
-		haveArgsEverChanged: boolean;
 	}>({
-		results: initialResults,
-		status: initialStatus,
-		isLoading: initialIsLoading,
-		error: undefined,
-		loadMore: () => false,
-		resetKey: 0,
-		haveArgsEverChanged: false
+		...machine.getSnapshot()
 	});
 
-	function computeIsLoading(status: PaginationStatus): boolean {
-		// While we’re still on initial args + have initialData, keep isLoading=false
-		if (hasInitialData && !state.haveArgsEverChanged) {
-			return false;
-		}
-		return status === 'LoadingFirstPage' || status === 'LoadingMore';
+	// Sync machine state to Svelte reactive state
+	function syncFromMachine() {
+		const snapshot = machine.getSnapshot();
+		state.results = snapshot.results;
+		state.status = snapshot.status;
+		state.isLoading = snapshot.isLoading;
+		state.error = snapshot.error;
+		state.loadMore = snapshot.loadMore;
+		state.resetKey = snapshot.resetKey;
 	}
 
 	$effect(() => {
-		const _resetKey = state.resetKey;
+		// Read resetKey to create reactive dependency - triggers re-run on InvalidCursor reset
+		void state.resetKey;
 
+		// Parse current args (reactive read)
 		const argsObject = parseArgsWithSkip(
 			args as Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
 		);
 		const opts = parsePaginatedOptions<Query>(options);
-		const keepPrevious = !!opts.keepPreviousData;
 
-		// Track when args change away from the initial key
-		if (!state.haveArgsEverChanged && !argsKeyEqual(initialArgs, argsObject)) {
-			state.haveArgsEverChanged = true;
-		}
+		// Notify machine of args change
+		const argsKey =
+			argsObject === SKIP ? null : serializeArgsKey(argsObject as Record<string, unknown>);
+		machine.onArgsChange(argsKey);
+		syncFromMachine();
 
+		// Handle disabled client
 		if (client.disabled) {
-			state.isLoading = !hasInitialData;
-			state.error = undefined;
-			state.loadMore = () => false;
 			return;
 		}
 
-		const isSkipped = argsObject === SKIP;
-
-		if (isSkipped) {
-			state.results = [] as PageItem<Query>[];
-			state.status = 'LoadingFirstPage';
-			state.isLoading = false;
-			state.error = undefined;
-			state.loadMore = () => false;
+		// Handle skip - no subscription needed
+		if (argsObject === SKIP) {
 			return;
 		}
 
-		const usingInitialData = hasInitialData && !state.haveArgsEverChanged;
-
+		// Create subscription to Convex paginated query
 		const unsubscribe = client.onPaginatedUpdate_experimental(
 			query,
 			argsObject,
@@ -139,78 +145,34 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 				const current = unsubscribe.getCurrentValue?.();
 				if (!current) return;
 
-				// 🔑 While hydrating from initialData, ignore the first
-				// "empty loading" snapshot: keep SSR page visible.
-				if (
-					usingInitialData &&
-					Array.isArray(current.results) &&
-					current.results.length === 0 &&
-					current.status === 'LoadingFirstPage'
-				) {
-					state.loadMore = (numItems: number) => current.loadMore(numItems);
-					state.isLoading = false;
-					return;
-				}
-
-				state.results = current.results as PageItem<Query>[];
-				state.status = current.status;
-				state.isLoading = computeIsLoading(current.status);
-				state.error = undefined;
-				state.loadMore = (numItems: number) => current.loadMore(numItems);
+				// Feed update to state machine (handles hydration guard, etc.)
+				machine.onUpdate({
+					results: current.results as PageItem<Query>[],
+					status: current.status,
+					loadMore: (numItems: number) => current.loadMore(numItems)
+				});
+				syncFromMachine();
 			},
 			(error: Error) => {
-				if (error.message.includes('InvalidCursor')) {
-					console.warn('usePaginatedQuery hit InvalidCursor, resetting pagination state:', error);
-					state.results = [] as PageItem<Query>[];
-					state.status = 'LoadingFirstPage';
-					state.isLoading = true;
-					state.error = undefined;
-					state.resetKey = _resetKey + 1;
-					return;
-				}
-
-				state.error = error;
-				state.isLoading = false;
+				// Feed error to state machine (handles InvalidCursor detection)
+				machine.onError(error);
+				syncFromMachine();
+				// If InvalidCursor was detected, resetKey changed and effect will re-run
 			}
 		);
 
+		// Get initial cached value if available
 		const current = unsubscribe.getCurrentValue?.();
-
 		if (current) {
-			// Same hydration guard for the initial cached snapshot
-			if (
-				usingInitialData &&
-				Array.isArray(current.results) &&
-				current.results.length === 0 &&
-				current.status === 'LoadingFirstPage'
-			) {
-				state.loadMore = (numItems: number) => current.loadMore(numItems);
-				state.isLoading = false;
-			} else {
-				state.results = current.results as PageItem<Query>[];
-				state.status = current.status;
-				state.isLoading = computeIsLoading(current.status);
-				state.error = undefined;
-				state.loadMore = (numItems: number) => current.loadMore(numItems);
-			}
-		} else {
-			// No cached value yet
-			const shouldKeepPrevious = keepPrevious && state.results.length > 0;
-
-			if (!usingInitialData && !shouldKeepPrevious) {
-				state.results = [] as PageItem<Query>[];
-				state.status = 'LoadingFirstPage';
-			}
-			state.isLoading = usingInitialData ? false : true;
-			state.error = undefined;
-
-			state.loadMore = (numItems: number) => {
-				const latest = unsubscribe.getCurrentValue?.();
-				if (!latest) return false;
-				return latest.loadMore(numItems);
-			};
+			machine.onUpdate({
+				results: current.results as PageItem<Query>[],
+				status: current.status,
+				loadMore: (numItems: number) => current.loadMore(numItems)
+			});
+			syncFromMachine();
 		}
 
+		// Cleanup on unmount or re-run
 		return () => {
 			if (typeof unsubscribe === 'function') {
 				unsubscribe();
