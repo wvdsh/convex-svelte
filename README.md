@@ -6,7 +6,19 @@
 
 Receive live updates to Convex query subscriptions and call mutations and actions from Svelte with `convex-svelte`.
 
-To install:
+## Table of Contents
+
+- [Installation](#installation)
+- [Example](#example)
+- [Conditionally skipping queries](#conditionally-skipping-queries)
+- [Paginated queries](#paginated-queries)
+- [Server-side rendering](#server-side-rendering)
+- [Troubleshooting](#troubleshooting)
+- [Deploying a Svelte App](#deploying-a-svelte-app)
+- [Trying out this library](#trying-out-this-library)
+- [Developing this library](#developing-this-library)
+
+## Installation
 
 ```
 npm install convex convex-svelte
@@ -21,7 +33,7 @@ a `useConvexClient()` which returns a [ConvexClient](https://docs.convex.dev/api
 used to set authentication credentials and run Convex mutations and actions,
 and a `useQuery()` function for subscribing to Convex queries.
 
-### Example
+## Example
 
 Call `setupConvex()` in a component above the components that need to Convex queries
 and use `useQuery()` components where you need to listen to the query.
@@ -91,7 +103,7 @@ Running a mutation looks like
 </form>
 ```
 
-### Conditionally skipping queries
+## Conditionally skipping queries
 
 You can conditionally skip a query by returning the string `'skip'` from the arguments function.
 This is useful when a query depends on some condition, like authentication state or user input.
@@ -120,7 +132,67 @@ const activeUserResponse = useQuery(
 
 When a query is skipped, `isLoading` will be `false`, `error` will be `null`, and `data` will be `undefined`.
 
-### Server-side rendering
+## Paginated queries
+
+For queries that return large datasets, use `usePaginatedQuery()` to load results incrementally. This hook manages cursor-based pagination automatically and provides a `loadMore` function to fetch additional pages.
+
+```svelte
+<script lang="ts">
+	import { usePaginatedQuery } from 'convex-svelte';
+	import { api } from '../../convex/_generated/api.js'; // depending on file location
+
+	const paginatedMessages = usePaginatedQuery(
+		api.messages.listPaginated,
+		() => ({}),
+		{ initialNumItems: 10 }
+	);
+</script>
+
+{#if paginatedMessages.isLoading}
+	Loading...
+{:else if paginatedMessages.error}
+	Error: {paginatedMessages.error.toString()}
+{:else}
+	<ul>
+		{#each paginatedMessages.results as message}
+			<li>
+				<span>{message.author}</span>
+				<span>{message.body}</span>
+			</li>
+		{/each}
+	</ul>
+	{#if paginatedMessages.status === 'CanLoadMore'}
+		<button onclick={() => paginatedMessages.loadMore(10)}>Load more</button>
+	{/if}
+{/if}
+```
+
+### Paginated query options
+
+The third argument accepts the following options:
+
+- **initialNumItems** (required) - Number of items to load on the first page
+- **initialData** - Optional initial data for SSR/hydration
+- **keepPreviousData** - When `true`, keeps previous results visible while loading new data after args change
+
+You can also skip a paginated query by returning `'skip'` from the arguments function, just like with `useQuery()`.
+
+```svelte
+<script lang="ts">
+	import { usePaginatedQuery } from 'convex-svelte';
+	import { api } from '../../convex/_generated/api.js'; // depending on file location
+
+	let searchTerm = $state('');
+
+	const searchResults = usePaginatedQuery(
+		api.messages.search,
+		() => (searchTerm.length > 0 ? { query: searchTerm } : 'skip'),
+		{ initialNumItems: 20, keepPreviousData: true }
+	);
+</script>
+```
+
+## Server-side rendering
 
 `useQuery()` accepts an `initialData` option in its third argument.
 By defining a `load()` function in a +page.server.ts file
@@ -161,7 +233,7 @@ export const load = (async () => {
 
 Combining specifying `initialData` and either setting the `keepPreviousData` option to true or never modifying the arguments passed to a query should be enough to avoid ever seeing a loading state for a `useQuery()`.
 
-### Troubleshooting
+## Troubleshooting
 
 #### effect_in_teardown Error
 
@@ -171,7 +243,7 @@ When `useQuery` is wrapped in `$derived`, state changes during component cleanup
 
 Use [Conditionally skipping queries](#conditionally-skipping-queries) instead. By calling `useQuery` unconditionally at the top level and passing a function that returns `'skip'`, the function is evaluated inside `useQuery`'s own effect tracking, preventing query recreation during cleanup.
 
-### Deploying a Svelte App
+## Deploying a Svelte App
 
 In production build pipelines use the build command
 
