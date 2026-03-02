@@ -4,7 +4,13 @@ import type { Value } from 'convex/values';
 import { useConvexClient } from './client.svelte.js';
 import { SKIP } from './shared/args.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
-import type { PageItem, PaginatedReturnType, UsePaginatedQueryOptions, UsePaginatedQueryReturn, WithoutPaginationOpts } from './shared/types.js';
+import type {
+	PageItem,
+	PaginatedReturnType,
+	UsePaginatedQueryOptions,
+	UsePaginatedQueryReturn,
+	WithoutPaginationOpts
+} from './shared/types.js';
 import {
 	PaginatedQueryStateMachine,
 	serializeArgsKey,
@@ -153,13 +159,13 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 
 		// Get initial cached value if available (only if callback hasn't fired synchronously)
 		if (!hasReceivedUpdate) {
-		const current = unsubscribe.getCurrentValue?.();
-		if (current) {
-			machine.onUpdate({
-				results: current.results as PageItem<Query>[],
-				status: current.status,
-				loadMore: (numItems: number) => current.loadMore(numItems)
-			});
+			const current = unsubscribe.getCurrentValue?.();
+			if (current) {
+				machine.onUpdate({
+					results: current.results as PageItem<Query>[],
+					status: current.status,
+					loadMore: (numItems: number) => current.loadMore(numItems)
+				});
 			}
 		}
 

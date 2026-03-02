@@ -112,23 +112,22 @@ This is useful when a query depends on some condition, like authentication state
 
 ```svelte
 <script lang="ts">
-import { useQuery } from "@mmailaender/convex-svelte";
-import { api } from "../convex/_generated/api.js";
+	import { useQuery } from '@mmailaender/convex-svelte';
+	import { api } from '../convex/_generated/api.js';
 
-let auth = $state({ isAuthenticated: true });
+	let auth = $state({ isAuthenticated: true });
 
-const activeUserResponse = useQuery(
-  api.users.queries.getActiveUser,
-  () => (auth.isAuthenticated ? {} : 'skip')
-);
+	const activeUserResponse = useQuery(api.users.queries.getActiveUser, () =>
+		auth.isAuthenticated ? {} : 'skip'
+	);
 </script>
 
 {#if activeUserResponse.isLoading}
-  Loading user...
+	Loading user...
 {:else if activeUserResponse.error}
-  Error: {activeUserResponse.error}
+	Error: {activeUserResponse.error}
 {:else if activeUserResponse.data}
-  Welcome, {activeUserResponse.data.name}!
+	Welcome, {activeUserResponse.data.name}!
 {/if}
 ```
 
@@ -143,11 +142,9 @@ For queries that return large datasets, use `usePaginatedQuery()` to load result
 	import { usePaginatedQuery } from '@mmailaender/convex-svelte';
 	import { api } from '../../convex/_generated/api.js'; // depending on file location
 
-	const paginatedMessages = usePaginatedQuery(
-		api.messages.listPaginated,
-		() => ({}),
-		{ initialNumItems: 10 }
-	);
+	const paginatedMessages = usePaginatedQuery(api.messages.listPaginated, () => ({}), {
+		initialNumItems: 10
+	});
 </script>
 
 {#if paginatedMessages.isLoading}

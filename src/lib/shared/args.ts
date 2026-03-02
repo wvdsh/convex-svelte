@@ -1,5 +1,5 @@
-import { convexToJson, type Value } from "convex/values";
-import type { MaybeSkipArgsOrFn } from "./types.js";
+import { convexToJson, type Value } from 'convex/values';
+import type { MaybeSkipArgsOrFn } from './types.js';
 
 /**
  * A symbol used internally to represent "skip".
@@ -12,7 +12,7 @@ import type { MaybeSkipArgsOrFn } from "./types.js";
  * internally. Svelte already does; React could adopt it later even though
  * today it handles "skip" inline in the hook.
  */
-export const SKIP = Symbol("convex.useQuery.skip");
+export const SKIP = Symbol('convex.useQuery.skip');
 export type Skip = typeof SKIP;
 
 /**
@@ -35,21 +35,19 @@ export type Skip = typeof SKIP;
  *     re-implementing their own "skip" logic.
  */
 export function normalizeArgs(
-  input: MaybeSkipArgsOrFn
-):
-  | { skip: true; args: undefined }
-  | { skip: false; args: Record<string, Value> } {
-  if (typeof input === "function") {
-    input = input();
-  }
+	input: MaybeSkipArgsOrFn
+): { skip: true; args: undefined } | { skip: false; args: Record<string, Value> } {
+	if (typeof input === 'function') {
+		input = input();
+	}
 
-  if (input === "skip") {
-    return { skip: true, args: undefined };
-  }
+	if (input === 'skip') {
+		return { skip: true, args: undefined };
+	}
 
-  //  If parseArgs from convex/common would be shared we could also use it here
-  //  const parsed = parseArgs(input);
-  return { skip: false, args: input };
+	//  If parseArgs from convex/common would be shared we could also use it here
+	//  const parsed = parseArgs(input);
+	return { skip: false, args: input };
 }
 
 /**
@@ -67,11 +65,8 @@ export function normalizeArgs(
  *   - Keeps argument equality semantics identical across all clients.
  *   - Avoids re-implementing "JSON.stringify(convexToJson())" in each framework.
  */
-export function jsonEqualArgs(
-  a: Record<string, Value>,
-  b: Record<string, Value>
-): boolean {
-  return JSON.stringify(convexToJson(a)) === JSON.stringify(convexToJson(b));
+export function jsonEqualArgs(a: Record<string, Value>, b: Record<string, Value>): boolean {
+	return JSON.stringify(convexToJson(a)) === JSON.stringify(convexToJson(b));
 }
 
 /**
@@ -93,10 +88,10 @@ export function jsonEqualArgs(
  *     needs this exact comparison logic.
  */
 export function argsKeyEqual(
-  a: Record<string, Value> | Skip,
-  b: Record<string, Value> | Skip
+	a: Record<string, Value> | Skip,
+	b: Record<string, Value> | Skip
 ): boolean {
-  if (a === SKIP && b === SKIP) return true;
-  if (a === SKIP || b === SKIP) return false;
-  return jsonEqualArgs(a, b);
+	if (a === SKIP && b === SKIP) return true;
+	if (a === SKIP || b === SKIP) return false;
+	return jsonEqualArgs(a, b);
 }

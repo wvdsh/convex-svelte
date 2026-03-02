@@ -1,6 +1,6 @@
-import type { PaginationStatus } from "convex/browser";
-import type { FunctionReference } from "convex/server";
-import type { Value } from "convex/values";
+import type { PaginationStatus } from 'convex/browser';
+import type { FunctionReference } from 'convex/server';
+import type { Value } from 'convex/values';
 
 /**
  * A user-level argument for a query:
@@ -13,7 +13,7 @@ import type { Value } from "convex/values";
  *
  * This type captures the *public* shape clients might accept.
  */
-export type MaybeSkipArgs = Record<string, Value> | "skip";
+export type MaybeSkipArgs = Record<string, Value> | 'skip';
 
 /**
  * Extended shape for frameworks that support closures for args:
@@ -29,9 +29,7 @@ export type MaybeSkipArgs = Record<string, Value> | "skip";
  *   - It lets all clients share one “normalized” representation of their
  *     incoming args, even if they only use a subset of it.
  */
-export type MaybeSkipArgsOrFn =
-  | MaybeSkipArgs
-  | (() => MaybeSkipArgs);
+export type MaybeSkipArgsOrFn = MaybeSkipArgs | (() => MaybeSkipArgs);
 
 /**
  * Remove any `paginationOpts` field from a query’s args type.
@@ -49,8 +47,8 @@ export type MaybeSkipArgsOrFn =
  *     not a Svelte-specific one.
  */
 export type WithoutPaginationOpts<Args> = Args extends { paginationOpts: any }
-  ? Omit<Args, "paginationOpts"> & { paginationOpts?: never }
-  : Args & { paginationOpts?: never };
+	? Omit<Args, 'paginationOpts'> & { paginationOpts?: never }
+	: Args & { paginationOpts?: never };
 
 /**
  * The return shape of a Convex paginated query.
@@ -63,9 +61,9 @@ export type WithoutPaginationOpts<Args> = Args extends { paginationOpts: any }
  *   - Type-safe validation of paginated query returns
  */
 export type PaginatedReturnType<T> = {
-  page: T[];
-  isDone: boolean;
-  continueCursor: string;
+	page: T[];
+	isDone: boolean;
+	continueCursor: string;
 };
 
 /**
@@ -80,11 +78,11 @@ export type PaginatedReturnType<T> = {
  *   - Svelte: used for `UsePaginatedQueryReturn<Query>`.
  *   - React: currently inlines similar logic; this makes it reusable.
  */
-export type PageItem<
-  Query extends FunctionReference<"query">
-> = Query["_returnType"] extends { page: (infer Item)[] }
-  ? Item
-  : never;
+export type PageItem<Query extends FunctionReference<'query'>> = Query['_returnType'] extends {
+	page: (infer Item)[];
+}
+	? Item
+	: never;
 
 /**
  * Framework-agnostic pagination options.
@@ -102,10 +100,10 @@ export type PageItem<
  *     support, regardless of framework.
  */
 export type UsePaginatedQueryOptions = {
-  /**
-   * Number of items to load in the first page.
-   */
-  initialNumItems: number;
+	/**
+	 * Number of items to load in the first page.
+	 */
+	initialNumItems: number;
 };
 
 /**
@@ -125,11 +123,9 @@ export type UsePaginatedQueryOptions = {
  *     frameworks should adhere to.
  *   - Additional fields can be added per-framework without diverging on the core.
  */
-export type UsePaginatedQueryReturn<
-  Query extends FunctionReference<"query">
-> = {
-  results: PageItem<Query>[];
-  status: PaginationStatus;
-  isLoading: boolean;
-  loadMore: (numItems: number) => boolean;
+export type UsePaginatedQueryReturn<Query extends FunctionReference<'query'>> = {
+	results: PageItem<Query>[];
+	status: PaginationStatus;
+	isLoading: boolean;
+	loadMore: (numItems: number) => boolean;
 };
