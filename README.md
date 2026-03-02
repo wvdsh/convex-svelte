@@ -1,10 +1,12 @@
+> **Community Fork**: This is a community-maintained fork of the official [`convex-svelte`](https://github.com/get-convex/convex-svelte) package, published as `@mmailaender/convex-svelte`. It includes additional features like paginated queries and other community-requested improvements. This fork exists as an intermediate solution until the official package is updated.
+
 [Convex](https://www.convex.dev/) is the typesafe backend-as-a-service with realtime updates, server functions, crons and scheduled jobs, file storage, vector search, and more.
 
 [Quickstart](https://docs.convex.dev/quickstart/svelte)
 
-# convex-svelte
+# @mmailaender/convex-svelte
 
-Receive live updates to Convex query subscriptions and call mutations and actions from Svelte with `convex-svelte`.
+Receive live updates to Convex query subscriptions and call mutations and actions from Svelte with `@mmailaender/convex-svelte`.
 
 ## Table of Contents
 
@@ -21,7 +23,7 @@ Receive live updates to Convex query subscriptions and call mutations and action
 ## Installation
 
 ```
-npm install convex convex-svelte
+npm install convex @mmailaender/convex-svelte
 ```
 
 Run `npx convex init` to get started with Convex.
@@ -79,7 +81,7 @@ Running a mutation looks like
 ```svelte
 <script lang="ts">
 	import { api } from '../../convex/_generated/api.js'; // depending on file location
-	import { useConvexClient } from 'convex-svelte';
+	import { useConvexClient } from '@mmailaender/convex-svelte';
 	const client = useConvexClient();
 
 	let toSend = $state('');
@@ -110,7 +112,7 @@ This is useful when a query depends on some condition, like authentication state
 
 ```svelte
 <script lang="ts">
-import { useQuery } from "convex-svelte";
+import { useQuery } from "@mmailaender/convex-svelte";
 import { api } from "../convex/_generated/api.js";
 
 let auth = $state({ isAuthenticated: true });
@@ -138,7 +140,7 @@ For queries that return large datasets, use `usePaginatedQuery()` to load result
 
 ```svelte
 <script lang="ts">
-	import { usePaginatedQuery } from 'convex-svelte';
+	import { usePaginatedQuery } from '@mmailaender/convex-svelte';
 	import { api } from '../../convex/_generated/api.js'; // depending on file location
 
 	const paginatedMessages = usePaginatedQuery(
@@ -179,7 +181,7 @@ You can also skip a paginated query by returning `'skip'` from the arguments fun
 
 ```svelte
 <script lang="ts">
-	import { usePaginatedQuery } from 'convex-svelte';
+	import { usePaginatedQuery } from '@mmailaender/convex-svelte';
 	import { api } from '../../convex/_generated/api.js'; // depending on file location
 
 	let searchTerm = $state('');
