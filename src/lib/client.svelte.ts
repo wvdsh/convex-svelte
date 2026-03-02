@@ -23,19 +23,19 @@ export const useConvexClient = (): ConvexClient => {
 	return client;
 };
 
-export const setConvexClientContext = (client: ConvexClient): void => {
-	setContext(_contextKey, client);
+export const setConvexClientContext = (client: ConvexClient): ConvexClient => {
+	return setContext(_contextKey, client);
 };
 
-export const setupConvex = (url: string, options: ConvexClientOptions = {}) => {
+export const setupConvex = (url: string, options: ConvexClientOptions = {}): ConvexClient => {
 	if (!url || typeof url !== 'string') {
 		throw new Error('Expected string url property for setupConvex');
 	}
 	const optionsWithDefaults = { disabled: !BROWSER, ...options };
 
-	const client = new ConvexClient(url, optionsWithDefaults);
-	setConvexClientContext(client);
+	const client = setConvexClientContext(new ConvexClient(url, optionsWithDefaults));
 	$effect(() => () => client.close());
+	return client;
 };
 
 type UseQueryOptions<Query extends FunctionReference<'query'>> = {
