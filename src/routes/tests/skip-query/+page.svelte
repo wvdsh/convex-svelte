@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { useQuery } from '$lib/client.svelte.js';
+	import { useQuery, type UseQueryReturn } from '$lib/client.svelte.js';
 	import { api } from '../../../convex/_generated/api.js';
 
 	let skipQuery = $state(false);
 
-	const messages = useQuery(api.messages.list, () => (skipQuery ? 'skip' : { muteWords: [] }));
+	const messages: UseQueryReturn<typeof api.messages.list> = useQuery(api.messages.list, () => (skipQuery ? 'skip' : { muteWords: [] }));
 </script>
 
 <section>

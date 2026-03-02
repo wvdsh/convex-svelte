@@ -38,14 +38,14 @@ export const setupConvex = (url: string, options: ConvexClientOptions = {}): Con
 	return client;
 };
 
-type UseQueryOptions<Query extends FunctionReference<'query'>> = {
+export type UseQueryOptions<Query extends FunctionReference<'query'>> = {
 	// Use this data and assume it is up to date (typically for SSR and hydration)
 	initialData?: FunctionReturnType<Query>;
 	// Instead of loading, render result from outdated args
 	keepPreviousData?: boolean;
 };
 
-type UseQueryReturn<Query extends FunctionReference<'query'>> =
+export type UseQueryReturn<Query extends FunctionReference<'query'>> =
 	| { data: undefined; error: undefined; isLoading: true; isStale: false }
 	| { data: undefined; error: Error; isLoading: false; isStale: boolean }
 	| { data: FunctionReturnType<Query>; error: undefined; isLoading: false; isStale: boolean };
