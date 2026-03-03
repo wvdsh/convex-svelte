@@ -1,4 +1,11 @@
 // Reexport your entry components here
 
-export { useConvexClient, setupConvex, useQuery, setConvexClientContext, type UseQueryOptions, type UseQueryReturn } from './client.svelte.js';
+export {
+	useConvexClient,
+	setupConvex,
+	useQuery,
+	setConvexClientContext,
+	type UseQueryOptions,
+	type UseQueryReturn
+} from './client.svelte.js';
 export { usePaginatedQuery } from './use_paginated_query.svelte.js';

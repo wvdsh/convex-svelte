@@ -4,7 +4,9 @@
 
 	let skipQuery = $state(false);
 
-	const messages: UseQueryReturn<typeof api.messages.list> = useQuery(api.messages.list, () => (skipQuery ? 'skip' : { muteWords: [] }));
+	const messages: UseQueryReturn<typeof api.messages.list> = useQuery(api.messages.list, () =>
+		skipQuery ? 'skip' : { muteWords: [] }
+	);
 </script>
 
 <section>
