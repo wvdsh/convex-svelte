@@ -1,4 +1,5 @@
 import { getContext, setContext, untrack } from 'svelte';
+import { BROWSER } from 'esm-env';
 import { ConvexClient, type ConvexClientOptions } from 'convex/browser';
 import {
 	type FunctionReference,
@@ -6,8 +7,9 @@ import {
 	type FunctionReturnType,
 	getFunctionName
 } from 'convex/server';
-import { convexToJson, type Value } from 'convex/values';
-import { BROWSER } from 'esm-env';
+import type { Value } from 'convex/values';
+import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.js';
+import { parseArgsWithSkip } from './internal/args.svelte.js';
 
 const _contextKey = '$$_convexClient';
 
@@ -21,33 +23,29 @@ export const useConvexClient = (): ConvexClient => {
 	return client;
 };
 
-export const setConvexClientContext = (client: ConvexClient): void => {
-	setContext(_contextKey, client);
+export const setConvexClientContext = (client: ConvexClient): ConvexClient => {
+	return setContext(_contextKey, client);
 };
 
-export const setupConvex = (url: string, options: ConvexClientOptions = {}) => {
+export const setupConvex = (url: string, options: ConvexClientOptions = {}): ConvexClient => {
 	if (!url || typeof url !== 'string') {
 		throw new Error('Expected string url property for setupConvex');
 	}
 	const optionsWithDefaults = { disabled: !BROWSER, ...options };
 
-	const client = new ConvexClient(url, optionsWithDefaults);
-	setConvexClientContext(client);
+	const client = setConvexClientContext(new ConvexClient(url, optionsWithDefaults));
 	$effect(() => () => client.close());
+	return client;
 };
 
-// Internal sentinel for "skip" so we don't pass the literal string through everywhere
-const SKIP = Symbol('convex.useQuery.skip');
-type Skip = typeof SKIP;
-
-type UseQueryOptions<Query extends FunctionReference<'query'>> = {
+export type UseQueryOptions<Query extends FunctionReference<'query'>> = {
 	// Use this data and assume it is up to date (typically for SSR and hydration)
 	initialData?: FunctionReturnType<Query>;
 	// Instead of loading, render result from outdated args
 	keepPreviousData?: boolean;
 };
 
-type UseQueryReturn<Query extends FunctionReference<'query'>> =
+export type UseQueryReturn<Query extends FunctionReference<'query'>> =
 	| { data: undefined; error: undefined; isLoading: true; isStale: false }
 	| { data: undefined; error: Error; isLoading: false; isStale: boolean }
 	| { data: FunctionReturnType<Query>; error: undefined; isLoading: false; isStale: boolean };
@@ -93,7 +91,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	// When args change we need to unsubscribe to the old query and subscribe
 	// to the new one.
 	$effect(() => {
-		const argsObject = parseArgs(args);
+		const argsObject = parseArgsWithSkip(args);
 
 		// If skipped, don't create any subscription
 		if (argsObject === SKIP) {
@@ -128,8 +126,8 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	 ** staleness & args tracking **
 	 * Are the args (the query key) the same as the last args we received a result for?
 	 */
-	const currentArgs = $derived(parseArgs(args));
-	const initialArgs = parseArgs(args);
+	const currentArgs = $derived(parseArgsWithSkip(args));
+	const initialArgs = parseArgsWithSkip(args);
 
 	const sameArgsAsLastResult = $derived(
 		state.argsForLastResult !== undefined &&
@@ -147,12 +145,12 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	// Once args change, move off of initialData.
 	$effect(() => {
 		if (!untrack(() => state.haveArgsEverChanged)) {
-			const curr = parseArgs(args);
+			const curr = parseArgsWithSkip(args);
 			if (!argsKeyEqual(initialArgs, curr)) {
 				state.haveArgsEverChanged = true;
 				const opts = parseOptions(options);
 				if (opts.initialData !== undefined) {
-					state.argsForLastResult = initialArgs === SKIP ? SKIP : $state.snapshot(initialArgs);
+					state.argsForLastResult = initialArgs === SKIP ? SKIP : $state.snapshot(initialArgs as Record<string, unknown>) as Record<string, Value>;
 					state.lastResult = opts.initialData;
 				}
 			}
@@ -187,7 +185,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 			value = e;
 		}
 		// Touch reactive state.result so updates retrigger computations
-		state.result;
+		void state.result;
 		return value;
 	});
 
@@ -233,19 +231,6 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 	} as UseQueryReturn<Query>;
 }
 
-/**
- *  args can be an object, "skip", or a closure returning either 
- **/
-function parseArgs(
-	args: Record<string, Value> | 'skip' | (() => Record<string, Value> | 'skip')
-): Record<string, Value> | Skip {
-	if (typeof args === 'function') {
-		args = args();
-	}
-	if (args === 'skip') return SKIP;
-	return $state.snapshot(args);
-}
-
 // options can be an object or a closure
 function parseOptions<Query extends FunctionReference<'query'>>(
 	options: UseQueryOptions<Query> | (() => UseQueryOptions<Query>)
@@ -254,14 +239,4 @@ function parseOptions<Query extends FunctionReference<'query'>>(
 		options = options();
 	}
 	return $state.snapshot(options);
-}
-
-function jsonEqualArgs(a: Record<string, Value>, b: Record<string, Value>): boolean {
-	return JSON.stringify(convexToJson(a)) === JSON.stringify(convexToJson(b));
-}
-
-function argsKeyEqual(a: Record<string, Value> | Skip, b: Record<string, Value> | Skip): boolean {
-	if (a === SKIP && b === SKIP) return true;
-	if (a === SKIP || b === SKIP) return false;
-	return jsonEqualArgs(a, b);
 }
