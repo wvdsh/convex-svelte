@@ -346,13 +346,16 @@ export class PaginatedQueryStateMachine<T> {
 		}
 
 		// Check for ConvexError with paginationError (structured error format)
-		if (
-			'data' in error &&
-			typeof (error as any).data === 'object' &&
-			(error as any).data !== null
-		) {
-			const data = (error as any).data;
-			if (data.isConvexSystemError === true && data.paginationError === 'InvalidCursor') {
+		if ('data' in error) {
+			const { data } = error as Error & { data: unknown };
+			if (
+				typeof data === 'object' &&
+				data !== null &&
+				'isConvexSystemError' in data &&
+				'paginationError' in data &&
+				(data as Record<string, unknown>).isConvexSystemError === true &&
+				(data as Record<string, unknown>).paginationError === 'InvalidCursor'
+			) {
 				return true;
 			}
 		}

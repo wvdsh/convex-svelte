@@ -1,5 +1,5 @@
 import type { PaginationStatus } from 'convex/browser';
-import type { FunctionReference } from 'convex/server';
+import type { FunctionReference, PaginationOptions } from 'convex/server';
 import type { Value } from 'convex/values';
 
 /**
@@ -46,7 +46,7 @@ export type MaybeSkipArgsOrFn = MaybeSkipArgs | (() => MaybeSkipArgs);
  *   - The "don’t pass paginationOpts yourself" rule is a Convex invariant,
  *     not a Svelte-specific one.
  */
-export type WithoutPaginationOpts<Args> = Args extends { paginationOpts: any }
+export type WithoutPaginationOpts<Args> = Args extends { paginationOpts: PaginationOptions }
 	? Omit<Args, 'paginationOpts'> & { paginationOpts?: never }
 	: Args & { paginationOpts?: never };
 

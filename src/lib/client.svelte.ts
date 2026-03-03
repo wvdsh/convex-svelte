@@ -150,7 +150,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 				state.haveArgsEverChanged = true;
 				const opts = parseOptions(options);
 				if (opts.initialData !== undefined) {
-					state.argsForLastResult = initialArgs === SKIP ? SKIP : $state.snapshot(initialArgs);
+					state.argsForLastResult = initialArgs === SKIP ? SKIP : $state.snapshot(initialArgs as Record<string, unknown>) as Record<string, Value>;
 					state.lastResult = opts.initialData;
 				}
 			}
@@ -185,7 +185,7 @@ export function useQuery<Query extends FunctionReference<'query'>>(
 			value = e;
 		}
 		// Touch reactive state.result so updates retrigger computations
-		state.result;
+		void state.result;
 		return value;
 	});
 

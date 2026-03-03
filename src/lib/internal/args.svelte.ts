@@ -8,5 +8,5 @@ import type { Value } from 'convex/values';
 export function parseArgsWithSkip(input: MaybeSkipArgsOrFn): Record<string, Value> | Skip {
 	const { skip, args } = normalizeArgs(input);
 	if (skip) return SKIP;
-	return $state.snapshot(args);
+	return $state.snapshot(args as Record<string, unknown>) as Record<string, Value>;
 }

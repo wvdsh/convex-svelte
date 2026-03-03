@@ -76,7 +76,7 @@
 	{:else}
 		<ul class="messages">
 			<ul>
-				{#each messages.results as message}
+				{#each messages.results as message (message._id)}
 					<li>
 						<span>{message.author}</span>
 						<span>{message.body}</span>
