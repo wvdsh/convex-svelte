@@ -13,6 +13,7 @@ Receive live updates to Convex query subscriptions and call mutations and action
 - [Installation](#installation)
 - [Setup](#setup)
 - [Queries](#queries)
+- [Async queries (experimental)](#async-queries-experimental)
 - [Paginated queries](#paginated-queries)
 - [Mutations](#mutations)
 - [Actions](#actions)
@@ -119,6 +120,78 @@ You can conditionally skip a query by returning `'skip'` from the arguments func
 ```
 
 When a query is skipped, `isLoading` will be `false`, `error` will be `null`, and `data` will be `undefined`.
+
+## Async queries (experimental)
+
+Pass `{ async: true }` to `useQuery()` to return a `PromiseLike` that works with Svelte's `await` keyword and `<svelte:boundary>` for declarative loading and error states.
+
+> **Note**: This requires Svelte's experimental async support. Add the following to your `svelte.config.js`:
+>
+> ```js
+> compilerOptions: {
+> 	experimental: {
+> 		async: true;
+> 	}
+> }
+> ```
+
+```svelte
+<script lang="ts">
+	import { useQuery } from '@mmailaender/convex-svelte';
+	import { api } from '../convex/_generated/api.js';
+
+	const messages = useQuery(api.messages.list, () => ({ muteWords: [] }), { async: true });
+	const user = useQuery(api.users.getActive, {}, { async: true });
+</script>
+
+<svelte:boundary>
+	{#snippet pending()}
+		<p>Loading...</p>
+	{/snippet}
+
+	{#snippet failed(error, reset)}
+		<p>Something went wrong: {(error as Error).message}</p>
+		<button onclick={reset}>Retry</button>
+	{/snippet}
+
+	{@const msgs = await messages}
+	{@const me = await user}
+
+	<h2>Welcome, {me.data.name}!</h2>
+	<ul>
+		{#each msgs.data as message}
+			<li>{message.author}: {message.body}</li>
+		{/each}
+	</ul>
+</svelte:boundary>
+```
+
+The `<svelte:boundary>` handles both loading and error states declaratively — no `{#if isLoading}` / `{:else if error}` / `{:else}` chains. Multiple queries can share a single boundary, so the `pending` snippet shows until **all** queries resolve.
+
+**Error handling**: The boundary fully covers errors — both during the initial load (promise rejects → `failed` snippet) and after data has arrived (e.g. auth expiry, network issues). The `data` getter throws errors so the boundary catches them as rendering errors automatically. Clicking the `Retry` button re-renders the content, picking up recovered data if the subscription has reconnected.
+
+**Loading states**: The boundary's `pending` snippet covers the initial load. For subsequent loading after reactive arg changes, the boundary does **not** re-enter `pending` (this is Svelte's design). Use `keepPreviousData: true` to display stale data during transitions, with `isStale` as a visual indicator:
+
+```svelte
+{@const result = await messages}
+
+{#if result.isStale}
+	<p>Updating...</p>
+{/if}
+
+<ul>
+	{#each result.data as message}
+		<li>{message.author}: {message.body}</li>
+	{/each}
+</ul>
+```
+
+### When to use async vs sync
+
+- **Use `useQuery()` (default sync)** when you want inline control over loading/error states, or need to render partial UI while data loads.
+- **Use `useQuery()` with `{ async: true }`** when you want boundary-based loading/error handling with less markup. This shines when grouping multiple queries under a single boundary. With Svelte 6's async renderer, this will also enable SSR without `+page.server.ts` boilerplate.
+
+All options (`initialData`, `keepPreviousData`, `skip`) work in both modes.
 
 ## Paginated queries
 

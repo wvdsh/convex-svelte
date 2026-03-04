@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import ts from 'typescript-eslint';
 import svelte from 'eslint-plugin-svelte';
@@ -15,6 +16,9 @@ export default ts.config(
 			globals: {
 				...globals.browser,
 				...globals.node
+			},
+			parserOptions: {
+				tsconfigRootDir: fileURLToPath(new URL('.', import.meta.url))
 			}
 		}
 	},

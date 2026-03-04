@@ -50,9 +50,10 @@
 	},
 	"peerDependencies": {
 		"convex": ">1.10.0",
-		"svelte": "^5.0.0"
+		"svelte": ">=5.36.0"
 	},
 	"devDependencies": {
+		"@convex-dev/eslint-plugin": "^1.1.1",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.54.2",
 		"@sveltejs/adapter-auto": "^7.0.1",
