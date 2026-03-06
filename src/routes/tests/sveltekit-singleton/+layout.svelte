@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { PUBLIC_CONVEX_URL } from '$env/static/public';
-	import { setupConvex } from '$lib/index.js';
-	import { initConvex, getConvexClient } from '$lib/sveltekit/index.js';
+	import { setupConvex, getConvexClient } from '$lib/index.js';
+	import { initConvex } from '$lib/sveltekit/index.js';
 
 	let { children } = $props();
 

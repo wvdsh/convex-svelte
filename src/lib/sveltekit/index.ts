@@ -3,7 +3,7 @@
 
 // Client lifecycle (module singleton)
 export { initConvex } from './client.js';
-export { getConvexClient, getConvexUrl } from '../internal/singleton.js';
+export { getConvexUrl } from '../internal/singleton.js';
 
 // Server-side HTTP client
 export { createConvexHttpClient, type CreateConvexHttpClientOptions } from './server.js';
