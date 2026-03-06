@@ -59,6 +59,36 @@
 			title: 'SvelteKit Singleton',
 			path: '/tests/sveltekit-singleton',
 			description: 'Tests SvelteKit singleton pattern for Convex client'
+		},
+		{
+			title: 'Mutation',
+			path: '/tests/mutation',
+			description: 'Tests calling mutations and reactive query updates'
+		},
+		{
+			title: 'ConvexLoad (SSR Transport)',
+			path: '/tests/convex-load',
+			description: 'Tests SSR transport with live upgrade via convexLoad'
+		},
+		{
+			title: 'getConvexClient',
+			path: '/tests/get-convex-client',
+			description: 'Tests calling mutations from a plain .ts utility file'
+		},
+		{
+			title: 'Keep Previous Data',
+			path: '/tests/keep-previous-data',
+			description: 'Tests keepPreviousData option for useQuery'
+		},
+		{
+			title: 'Optimistic Update',
+			path: '/tests/optimistic-update',
+			description: 'Tests optimistic updates with mutations'
+		},
+		{
+			title: 'ConvexHttpClient (Server)',
+			path: '/tests/convex-http-client',
+			description: 'Tests server-side data fetching with createConvexHttpClient'
 		}
 	];
 </script>

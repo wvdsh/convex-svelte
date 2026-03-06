@@ -6,7 +6,7 @@
  * - `setupConvex(url)` in root layout — handles context + cleanup, calls initConvex internally
  */
 import { ConvexClient, type ConvexClientOptions } from 'convex/browser';
-import { getSingletonClient, getSingletonUrl, setSingleton } from '../internal/singleton.js';
+import { getSingletonClient, setSingleton } from '../internal/singleton.js';
 
 const IS_BROWSER = typeof globalThis.document !== 'undefined';
 
@@ -30,31 +30,3 @@ export function initConvex(url: string, options: ConvexClientOptions = {}): Conv
 	return client;
 }
 
-/**
- * Get the module-level ConvexClient singleton.
- * Works anywhere (hooks, transport, utilities) — does not require Svelte context.
- *
- * @throws If `initConvex()` has not been called yet.
- */
-export function getConvexClient(): ConvexClient {
-	const client = getSingletonClient();
-	if (!client) {
-		throw new Error(
-			'Convex client not initialized. Call initConvex() first (e.g. in hooks.client.ts).'
-		);
-	}
-	return client;
-}
-
-/**
- * Get the stored Convex deployment URL.
- *
- * @throws If `initConvex()` has not been called yet.
- */
-export function getConvexUrl(): string {
-	const url = getSingletonUrl();
-	if (!url) {
-		throw new Error('Convex URL not set. Call initConvex() first.');
-	}
-	return url;
-}

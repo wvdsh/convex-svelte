@@ -8,7 +8,7 @@
 import type { FunctionReference, FunctionArgs } from 'convex/server';
 import { getFunctionName, makeFunctionReference } from 'convex/server';
 import { ConvexHttpClient } from 'convex/browser';
-import { getConvexUrl } from './client.js';
+import { getConvexUrl } from '../internal/singleton.js';
 import { createDetachedQuery, type DetachedQueryResult } from './query-detached.svelte.js';
 
 const IS_BROWSER = typeof globalThis.document !== 'undefined';

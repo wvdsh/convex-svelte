@@ -40,6 +40,18 @@ export const send = mutation({
 	}
 });
 
+export const deleteByAuthor = mutation({
+	args: { author: v.string() },
+	handler: async (ctx, { author }) => {
+		const messages = await ctx.db.query('messages').collect();
+		for (const msg of messages) {
+			if (msg.author === author) {
+				await ctx.db.delete(msg._id);
+			}
+		}
+	}
+});
+
 import seedMessages from './seed_messages.js';
 import { paginationOptsValidator } from 'convex/server';
 export const seed = internalMutation({

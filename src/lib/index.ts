@@ -18,3 +18,4 @@ export {
 	type UseAuthReturn
 } from './client.svelte.js';
 export { usePaginatedQuery } from './use_paginated_query.svelte.js';
+export { getConvexClient } from './internal/singleton.js';

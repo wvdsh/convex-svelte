@@ -5,7 +5,7 @@
  * The subscription lives until the ConvexClient is closed.
  */
 import type { FunctionReference, FunctionReturnType, FunctionArgs } from 'convex/server';
-import { getConvexClient } from './client.js';
+import { getConvexClient } from '../internal/singleton.js';
 
 export type DetachedQueryResult<Query extends FunctionReference<'query'>> = {
 	readonly data: FunctionReturnType<Query> | undefined;
