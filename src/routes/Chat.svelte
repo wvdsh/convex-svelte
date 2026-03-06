@@ -49,7 +49,9 @@
 <div class="flex w-full flex-col items-center gap-4">
 	<div class="flex w-full flex-col gap-3">
 		<div class="flex items-center gap-2">
-			<label for="muteWords" class="text-sm font-medium text-gray-700">Hide messages containing:</label>
+			<label for="muteWords" class="text-sm font-medium text-gray-700"
+				>Hide messages containing:</label
+			>
 			<input
 				type="text"
 				id="muteWords"
@@ -60,19 +62,48 @@
 			/>
 		</div>
 		<div class="flex items-center gap-2">
-			<input type="checkbox" id="useStale" name="useStale" bind:checked={useStale} class="rounded border-gray-300 text-blue-600" />
+			<input
+				type="checkbox"
+				id="useStale"
+				name="useStale"
+				bind:checked={useStale}
+				class="rounded border-gray-300 text-blue-600"
+			/>
 			<label for="useStale" class="text-sm text-gray-700">Display old results while loading</label>
 		</div>
 		<div class="flex items-center gap-2">
-			<input type="checkbox" id="skipQuery" name="skipQuery" bind:checked={skipQuery} class="rounded border-gray-300 text-blue-600" />
+			<input
+				type="checkbox"
+				id="skipQuery"
+				name="skipQuery"
+				bind:checked={skipQuery}
+				class="rounded border-gray-300 text-blue-600"
+			/>
 			<label for="skipQuery" class="text-sm text-gray-700">Skip query</label>
 		</div>
 	</div>
 
 	<form onsubmit={onSubmit} class="flex w-full max-w-lg items-center gap-2">
-		<input type="text" id="author" name="author" bind:value={author} class="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
-		<input type="text" id="body" name="body" bind:value={toSend} class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
-		<button type="submit" disabled={!toSend} class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Send</button>
+		<input
+			type="text"
+			id="author"
+			name="author"
+			bind:value={author}
+			class="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+		/>
+		<input
+			type="text"
+			id="body"
+			name="body"
+			bind:value={toSend}
+			class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+		/>
+		<button
+			type="submit"
+			disabled={!toSend}
+			class="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+			>Send</button
+		>
 	</form>
 
 	{#if messages.isLoading}
@@ -83,9 +114,13 @@
 		<ul class="w-full divide-y divide-gray-100">
 			{#each messages.results as message (message._id)}
 				<li class="flex items-baseline gap-4 py-2">
-					<span class="w-24 shrink-0 break-words text-sm font-semibold text-gray-900">{message.author}</span>
+					<span class="w-24 shrink-0 break-words text-sm font-semibold text-gray-900"
+						>{message.author}</span
+					>
 					<span class="min-w-0 flex-1 break-words text-sm text-gray-700">{message.body}</span>
-					<span class="shrink-0 text-xs whitespace-nowrap text-gray-400">{formatDate(message._creationTime)}</span>
+					<span class="shrink-0 text-xs whitespace-nowrap text-gray-400"
+						>{formatDate(message._creationTime)}</span
+					>
 				</li>
 			{/each}
 		</ul>

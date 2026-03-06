@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	const testRoutes = [
 		{
 			title: 'Always Errors',
@@ -90,7 +91,7 @@
 			path: '/tests/convex-http-client',
 			description: 'Tests server-side data fetching with createConvexHttpClient'
 		}
-	];
+	] as const;
 </script>
 
 <svelte:head>
@@ -107,9 +108,9 @@
 			Test Routes
 		</h2>
 		<div class="space-y-3">
-			{#each testRoutes as route}
+			{#each testRoutes as route (route.path)}
 				<a
-					href={route.path}
+					href={resolve(route.path)}
 					class="block rounded-lg border border-purple-200 bg-white p-4 shadow transition-shadow hover:border-purple-400 hover:shadow-md"
 				>
 					<h3 class="text-lg font-semibold text-gray-900">{route.title}</h3>

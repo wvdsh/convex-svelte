@@ -4,11 +4,7 @@
 
 	let muteWords = $state<string[]>([]);
 
-	const messages = useQuery(
-		api.messages.list,
-		() => ({ muteWords }),
-		{ keepPreviousData: true }
-	);
+	const messages = useQuery(api.messages.list, () => ({ muteWords }), { keepPreviousData: true });
 
 	let initialCount = $state<number | null>(null);
 
@@ -26,15 +22,10 @@
 <h1>Keep Previous Data Test</h1>
 
 <div>
-	<button
-		data-testid="change-args"
-		onclick={() => (muteWords = ['__nonexistent_mute_word_xyz__'])}
-	>
+	<button data-testid="change-args" onclick={() => (muteWords = ['__nonexistent_mute_word_xyz__'])}>
 		Change Args
 	</button>
-	<button data-testid="reset-args" onclick={() => (muteWords = [])}>
-		Reset Args
-	</button>
+	<button data-testid="reset-args" onclick={() => (muteWords = [])}> Reset Args </button>
 </div>
 
 <p data-testid="is-stale">isStale: {messages.isStale}</p>

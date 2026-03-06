@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { useConvexClient } from '$lib/index.js';
+	import { browser } from '$app/environment';
 	import { api } from '../../../convex/_generated/api.js';
 
 	let { data } = $props();
@@ -11,11 +12,7 @@
 	let sent = $state(false);
 	let cleaned = $state(false);
 	let mutationError = $state('');
-	let hydrated = $state(false);
-
-	$effect(() => {
-		hydrated = true;
-	});
+	let hydrated = $derived(browser);
 
 	async function sendTestMessage() {
 		try {

@@ -46,11 +46,7 @@ function deriveAuthContext(
 	const lastProcessedProviderAuth = opts?.lastProcessedProviderAuth;
 
 	let isLoading = isConvexAuthenticated === null;
-	if (
-		!isLoading &&
-		isConvexAuthenticated === false &&
-		lastProcessedProviderAuth !== undefined
-	) {
+	if (!isLoading && isConvexAuthenticated === false && lastProcessedProviderAuth !== undefined) {
 		if (providerIsAuthenticated !== lastProcessedProviderAuth) {
 			isLoading = true;
 		}

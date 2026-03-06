@@ -9,9 +9,7 @@
 	let sent = $state(false);
 	let cleaned = $state(false);
 
-	const testMessageExists = $derived(
-		messages.data?.some((m) => m.author === TEST_AUTHOR) ?? false
-	);
+	const testMessageExists = $derived(messages.data?.some((m) => m.author === TEST_AUTHOR) ?? false);
 </script>
 
 <svelte:head>

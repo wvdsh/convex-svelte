@@ -60,15 +60,33 @@
 		<div class="grid gap-4 sm:grid-cols-3">
 			<div class="flex flex-col gap-1">
 				<label for="a" class="text-sm font-medium text-gray-700">Number a</label>
-				<input id="a" type="number" oninput={(e) => handleNumericInput('a', e)} value={numbers.a} class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+				<input
+					id="a"
+					type="number"
+					oninput={(e) => handleNumericInput('a', e)}
+					value={numbers.a}
+					class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+				/>
 			</div>
 			<div class="flex flex-col gap-1">
 				<label for="b" class="text-sm font-medium text-gray-700">Number b</label>
-				<input id="b" type="number" oninput={(e) => handleNumericInput('b', e)} value={numbers.b} class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+				<input
+					id="b"
+					type="number"
+					oninput={(e) => handleNumericInput('b', e)}
+					value={numbers.b}
+					class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+				/>
 			</div>
 			<div class="flex flex-col gap-1">
 				<label for="c" class="text-sm font-medium text-gray-700">Number c</label>
-				<input id="c" type="number" oninput={(e) => handleNumericInput('c', e)} value={numbers.c} class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none" />
+				<input
+					id="c"
+					type="number"
+					oninput={(e) => handleNumericInput('c', e)}
+					value={numbers.c}
+					class="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+				/>
 			</div>
 		</div>
 

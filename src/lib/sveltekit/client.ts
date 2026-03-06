@@ -29,4 +29,3 @@ export function initConvex(url: string, options: ConvexClientOptions = {}): Conv
 	setSingleton(url, client);
 	return client;
 }
-

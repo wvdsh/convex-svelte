@@ -33,9 +33,7 @@ export function setSingleton(url: string, client: ConvexClient): void {
  */
 export function getConvexClient(): ConvexClient {
 	if (!_singletonClient) {
-		throw new Error(
-			'Convex client not initialized. Call setupConvex() or initConvex() first.'
-		);
+		throw new Error('Convex client not initialized. Call setupConvex() or initConvex() first.');
 	}
 	return _singletonClient;
 }

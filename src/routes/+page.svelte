@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Chat from './Chat.svelte';
 	import type { PageData } from './$types.js';
+	import { resolve } from '$app/paths';
 	let { data }: { data: PageData } = $props();
 </script>
 
@@ -29,11 +30,13 @@
 			Inputs Demo
 		</h2>
 		<a
-			href="/inputs"
+			href={resolve('/inputs')}
 			class="block rounded-lg border border-blue-200 bg-white p-4 shadow transition-shadow hover:border-blue-400 hover:shadow-md"
 		>
 			<h3 class="text-lg font-semibold text-gray-900">Modifying Several Inputs</h3>
-			<p class="mt-1 text-sm text-gray-600">Any user has complete control over these inputs but might change them quickly.</p>
+			<p class="mt-1 text-sm text-gray-600">
+				Any user has complete control over these inputs but might change them quickly.
+			</p>
 			<span class="mt-2 inline-block text-xs text-blue-600">/inputs</span>
 		</a>
 	</section>
