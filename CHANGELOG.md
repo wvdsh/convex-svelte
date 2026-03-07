@@ -1,5 +1,12 @@
 # @mmailaender/convex-svelte
 
+## 0.15.1
+
+### Patch Changes
+
+- Improvements
+  - Expose `UsePaginatedQuery` types and consolidate API reference table with type exports
+
 ## 0.15.0
 
 ### Minor Changes
