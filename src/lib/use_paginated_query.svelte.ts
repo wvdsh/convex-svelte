@@ -7,8 +7,8 @@ import { parseArgsWithSkip } from './internal/args.svelte.js';
 import type {
 	PageItem,
 	PaginatedReturnType,
-	UsePaginatedQueryOptions,
-	UsePaginatedQueryReturn,
+	UsePaginatedQueryOptions as BasePaginatedQueryOptions,
+	UsePaginatedQueryReturn as BasePaginatedQueryReturn,
 	WithoutPaginationOpts
 } from './shared/types.js';
 import {
@@ -17,8 +17,8 @@ import {
 	type PaginatedQueryConfig
 } from './shared/paginated_query_state.js';
 
-export type SveltePaginatedQueryOptions<Query extends FunctionReference<'query'>> =
-	UsePaginatedQueryOptions & {
+export type UsePaginatedQueryOptions<Query extends FunctionReference<'query'>> =
+	BasePaginatedQueryOptions & {
 		/**
 		 * Optional initial data for hydration/SSR.
 		 */
@@ -30,8 +30,8 @@ export type SveltePaginatedQueryOptions<Query extends FunctionReference<'query'>
 		keepPreviousData?: boolean;
 	};
 
-export type SveltePaginatedQueryReturn<Query extends FunctionReference<'query'>> =
-	UsePaginatedQueryReturn<Query> & {
+export type UsePaginatedQueryReturn<Query extends FunctionReference<'query'>> =
+	BasePaginatedQueryReturn<Query> & {
 		error: Error | undefined;
 	};
 
@@ -60,8 +60,8 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		| (() => WithoutPaginationOpts<FunctionArgs<Query>> | 'skip') = {} as WithoutPaginationOpts<
 		FunctionArgs<Query>
 	>,
-	options: SveltePaginatedQueryOptions<Query> | (() => SveltePaginatedQueryOptions<Query>)
-): SveltePaginatedQueryReturn<Query> {
+	options: UsePaginatedQueryOptions<Query> | (() => UsePaginatedQueryOptions<Query>)
+): UsePaginatedQueryReturn<Query> {
 	const client = useConvexClient();
 	if (typeof query === 'string') {
 		throw new Error('Query must be a functionReference object, not a string');
@@ -191,12 +191,12 @@ export function usePaginatedQuery<Query extends FunctionReference<'query'>>(
 		loadMore(numItems: number) {
 			return state.loadMore(numItems);
 		}
-	} as SveltePaginatedQueryReturn<Query>;
+	} as UsePaginatedQueryReturn<Query>;
 }
 
 function parsePaginatedOptions<Query extends FunctionReference<'query'>>(
-	options: SveltePaginatedQueryOptions<Query> | (() => SveltePaginatedQueryOptions<Query>)
-): SveltePaginatedQueryOptions<Query> {
+	options: UsePaginatedQueryOptions<Query> | (() => UsePaginatedQueryOptions<Query>)
+): UsePaginatedQueryOptions<Query> {
 	if (typeof options === 'function') {
 		options = options();
 	}
@@ -208,5 +208,5 @@ function parsePaginatedOptions<Query extends FunctionReference<'query'>>(
 	}
 	// Cast needed because $state.snapshot returns Snapshot<T>, but for plain
 	// Convex data the snapshot is structurally identical to the original type
-	return snapshot as SveltePaginatedQueryOptions<Query>;
+	return snapshot as UsePaginatedQueryOptions<Query>;
 }
