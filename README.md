@@ -801,51 +801,28 @@ Note that **subsequent navigations are always client-side** regardless of your S
 
 Import from `@mmailaender/convex-svelte`:
 
-| Export                                    | Type     | Description                                                                                                      |
+| Export                                    | Kind     | Description                                                                                                      |
 | ----------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | `setupConvex(url, options?)`              | Function | Initialize the Convex client and store it in Svelte context. Call once in a root layout. Returns `ConvexClient`. |
 | `useConvexClient()`                       | Function | Retrieve the `ConvexClient` from Svelte context. Must be called during component initialization.                 |
 | `getConvexClient()`                       | Function | Retrieve the `ConvexClient` module singleton. Works anywhere — no Svelte context needed.                         |
 | `useQuery(query, args, options?)`         | Function | Subscribe to a Convex query with reactive updates. Returns `UseQueryReturn`.                                     |
-| `usePaginatedQuery(query, args, options)` | Function | Subscribe to a paginated Convex query with cursor management. Returns `SveltePaginatedQueryReturn`.              |
+| `UseQueryOptions<Query>`                  | Type     | Options for `useQuery`: `initialData`, `keepPreviousData`, `async`.                                              |
+| `UseQueryReturn<Query>`                   | Type     | Return type of `useQuery`: `data`, `error`, `isLoading`, `isStale`.                                             |
+| `usePaginatedQuery(query, args, options)` | Function | Subscribe to a paginated Convex query with cursor management. Returns `UsePaginatedQueryReturn`.                 |
+| `UsePaginatedQueryOptions<Query>`         | Type     | Options for `usePaginatedQuery`: `initialNumItems`, `initialData`, `keepPreviousData`.                           |
+| `UsePaginatedQueryReturn<Query>`          | Type     | Return type of `usePaginatedQuery`: `results`, `status`, `isLoading`, `loadMore`, `error`.                      |
 | `setupAuth(provider, options?)`           | Function | Set up reactive authentication. Manages `setAuth`/`clearAuth` automatically.                                     |
+| `ConvexAuthProvider`                      | Type     | Auth provider state: `isLoading`, `isAuthenticated`, `fetchAccessToken`.                                         |
+| `SetupAuthOptions`                        | Type     | Options for `setupAuth`: `initialState` for SSR hydration.                                                       |
 | `useAuth()`                               | Function | Read auth state (`isLoading`, `isAuthenticated`) from context.                                                   |
-
-#### Types
-
-```ts
-type UseQueryOptions<Query> = {
-	initialData?: FunctionReturnType<Query>;
-	keepPreviousData?: boolean;
-	async?: boolean;
-};
-
-type UseQueryReturn<Query> =
-	| { data: undefined; error: undefined; isLoading: true; isStale: false }
-	| { data: undefined; error: Error; isLoading: false; isStale: boolean }
-	| { data: FunctionReturnType<Query>; error: undefined; isLoading: false; isStale: boolean };
-
-type ConvexAuthProvider = {
-	isLoading: boolean;
-	isAuthenticated: boolean;
-	fetchAccessToken: (args: { forceRefreshToken: boolean }) => Promise<string | null>;
-};
-
-type SetupAuthOptions = {
-	initialState?: { isAuthenticated: boolean };
-};
-
-type UseAuthReturn = {
-	readonly isLoading: boolean;
-	readonly isAuthenticated: boolean;
-};
-```
+| `UseAuthReturn`                           | Type     | Return type of `useAuth`: `isLoading`, `isAuthenticated`.                                                        |
 
 ### `convex-svelte/sveltekit` exports
 
 Import from `@mmailaender/convex-svelte/sveltekit`:
 
-| Export                              | Type     | Description                                                                                           |
+| Export                              | Kind     | Description                                                                                           |
 | ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | `initConvex(url, options?)`         | Function | Create the `ConvexClient` singleton early. Only needed for [convexLoad SSR setup](#convexload-setup). |
 | `getConvexUrl()`                    | Function | Retrieve the deployment URL set by `initConvex()` or `setupConvex()`.                                 |
@@ -853,13 +830,4 @@ Import from `@mmailaender/convex-svelte/sveltekit`:
 | `encodeConvexLoad`                  | Function | Transport encoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
 | `decodeConvexLoad`                  | Function | Transport decoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
 | `createConvexHttpClient(options?)`  | Function | Create a `ConvexHttpClient` for server-side use.                                                      |
-
-#### Types
-
-```ts
-type CreateConvexHttpClientOptions = {
-	url?: string;
-	token?: string;
-	options?: { skipConvexDeploymentUrlCheck?: boolean; logger?: ConvexClientOptions['logger'] };
-};
-```
+| `CreateConvexHttpClientOptions`     | Type     | Options for `createConvexHttpClient`: `url`, `token`, `options`.                                      |
