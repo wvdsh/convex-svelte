@@ -21,6 +21,15 @@ const IS_BROWSER = typeof globalThis.document !== 'undefined';
 export class ConvexLoadResult<T = unknown> {
 	readonly __convexLoad = true;
 
+	/** Always `false` — data was already fetched on the server. */
+	readonly isLoading = false;
+
+	/** Always `undefined` — the server fetch succeeded. */
+	readonly error: undefined = undefined;
+
+	/** Always `false` — fresh from the server. */
+	readonly isStale = false;
+
 	constructor(
 		public readonly refName: string,
 		public readonly args: Record<string, unknown>,
