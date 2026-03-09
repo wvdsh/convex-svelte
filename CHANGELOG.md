@@ -1,5 +1,11 @@
 # @mmailaender/convex-svelte
 
+## 0.15.4
+
+### Patch Changes
+
+- fix: Add `isLoading`, `error`, and `isStale` properties to `ConvexLoadResult` for consistent query state interface
+
 ## 0.15.3
 
 ### Patch Changes
