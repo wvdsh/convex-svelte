@@ -424,10 +424,8 @@ export function setupAuth(
 	if (BROWSER && hasInitialState && options.initialState?.isAuthenticated) {
 		const { fetchAccessToken } = authProvider();
 		initialSetAuthActive = true;
-		client.setAuth(fetchAccessToken, (backendIsAuthenticated) => {
-			if (initialSetAuthActive) {
-				isConvexAuthenticated = backendIsAuthenticated;
-			}
+		client.setAuth(fetchAccessToken, (backendIsAuthenticated: boolean) => {
+			isConvexAuthenticated = backendIsAuthenticated;
 		});
 	}
 
@@ -455,6 +453,31 @@ export function setupAuth(
 		// can detect stale reads between provider change and effect run.
 		lastProcessedProviderAuth = providerAuth;
 
+		// --- Hydration guard ---
+		// While the synchronous setAuth is active, it manages the WebSocket
+		// and token.  Don't interfere: skip state transitions and avoid a
+		// redundant client.setAuth() that would pause the socket (setConfig
+		// calls _pauseSocket) and cause a flash of null query results.
+		if (initialSetAuthActive) {
+			if (providerAuth) {
+				// Provider confirmed authentication — the sync setAuth already
+				// established this on the same fetchAccessToken.  Hand over
+				// lifecycle cleanup to the $effect without re-calling setAuth.
+				initialSetAuthActive = false;
+				return () => {
+					client.setAuth(
+						async () => null,
+						() => {
+							/* noop — cleanup only */
+						}
+					);
+				};
+			}
+			// Provider not yet authenticated (still loading or briefly false).
+			// The sync setAuth is handling the token fetch — don't override.
+			return;
+		}
+
 		// Only reset to "unknown" if the provider has settled before
 		// (going BACK to loading after having been settled).
 		// This preserves the SSR initialState during first hydration.
@@ -472,9 +495,6 @@ export function setupAuth(
 		// When the provider says authenticated, wire up client.setAuth
 		// so the Convex backend can confirm the token.
 		if (providerAuth) {
-			// Invalidate the synchronous initial setAuth callback — the $effect
-			// now owns the auth lifecycle.
-			initialSetAuthActive = false;
 			// Transition from "not authenticated" to "loading" immediately
 			// so consumers show a loading state while waiting for the backend
 			// to confirm the token, rather than a flash of unauthenticated.

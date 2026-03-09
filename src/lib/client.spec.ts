@@ -210,33 +210,61 @@ describe('setupAuth: SSR hydration — synchronous setAuth to prevent auth gap',
 		expect(shouldCallSyncSetAuth(false, { isAuthenticated: true })).toBe(false);
 	});
 
-	it('invalidates sync callback when $effect takes over', () => {
-		// Simulates the handoff: when $effect runs with providerAuth=true,
-		// it sets initialSetAuthActive=false to invalidate the sync callback.
-		let initialSetAuthActive = true;
-		let syncCallbackValue: boolean | null = null;
-		let effectCallbackValue: boolean | null = null;
+	it('sync callback always updates state (no guard)', () => {
+		// The sync callback has no initialSetAuthActive guard — it always
+		// updates isConvexAuthenticated.  The AuthenticationManager replaces
+		// the callback when the $effect's cleanup calls client.setAuth(),
+		// so stale updates are not possible after cleanup.
+		let stateValue: boolean | null = null;
 
-		// Simulate sync setAuth callback
 		const syncOnChange = (backendIsAuthenticated: boolean) => {
-			if (initialSetAuthActive) {
-				syncCallbackValue = backendIsAuthenticated;
-			}
+			stateValue = backendIsAuthenticated;
 		};
 
-		// Simulate effect taking over
-		initialSetAuthActive = false; // effect invalidates sync callback
-		const effectOnChange = (backendIsAuthenticated: boolean) => {
-			effectCallbackValue = backendIsAuthenticated;
-		};
-
-		// Old sync callback fires (stale) — should be ignored
 		syncOnChange(true);
-		expect(syncCallbackValue).toBe(null);
+		expect(stateValue).toBe(true);
 
-		// Effect callback fires — should update state
-		effectOnChange(true);
-		expect(effectCallbackValue).toBe(true);
+		syncOnChange(false);
+		expect(stateValue).toBe(false);
+	});
+
+	it('$effect skips setAuth when initialSetAuthActive is true (hydration guard)', () => {
+		// Simulates the hydration guard: when the $effect sees providerAuth=true
+		// but initialSetAuthActive is true, it hands over cleanup responsibility
+		// WITHOUT calling client.setAuth() again (which would pause the socket).
+		let initialSetAuthActive = true;
+		let setAuthCallCount = 0;
+
+		const simulateEffectRun = (providerAuth: boolean) => {
+			if (initialSetAuthActive) {
+				if (providerAuth) {
+					initialSetAuthActive = false;
+					// Returns cleanup — but does NOT call client.setAuth()
+					return 'cleanup';
+				}
+				// Provider not ready — skip everything
+				return 'skip';
+			}
+			// Normal path: would call client.setAuth()
+			if (providerAuth) {
+				setAuthCallCount++;
+				return 'setAuth';
+			}
+			return 'noop';
+		};
+
+		// Run 1: provider loading (auth=false), sync setAuth active → skip
+		expect(simulateEffectRun(false)).toBe('skip');
+		expect(setAuthCallCount).toBe(0);
+
+		// Run 2: provider settled (auth=true), sync setAuth active → handover
+		expect(simulateEffectRun(true)).toBe('cleanup');
+		expect(setAuthCallCount).toBe(0); // No redundant setAuth!
+		expect(initialSetAuthActive).toBe(false); // Flag cleared
+
+		// Run 3: after handover, normal path
+		expect(simulateEffectRun(true)).toBe('setAuth');
+		expect(setAuthCallCount).toBe(1);
 	});
 });
 

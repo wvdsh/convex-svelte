@@ -808,10 +808,10 @@ Import from `@mmailaender/convex-svelte`:
 | `getConvexClient()`                       | Function | Retrieve the `ConvexClient` module singleton. Works anywhere — no Svelte context needed.                         |
 | `useQuery(query, args, options?)`         | Function | Subscribe to a Convex query with reactive updates. Returns `UseQueryReturn`.                                     |
 | `UseQueryOptions<Query>`                  | Type     | Options for `useQuery`: `initialData`, `keepPreviousData`, `async`.                                              |
-| `UseQueryReturn<Query>`                   | Type     | Return type of `useQuery`: `data`, `error`, `isLoading`, `isStale`.                                             |
+| `UseQueryReturn<Query>`                   | Type     | Return type of `useQuery`: `data`, `error`, `isLoading`, `isStale`.                                              |
 | `usePaginatedQuery(query, args, options)` | Function | Subscribe to a paginated Convex query with cursor management. Returns `UsePaginatedQueryReturn`.                 |
 | `UsePaginatedQueryOptions<Query>`         | Type     | Options for `usePaginatedQuery`: `initialNumItems`, `initialData`, `keepPreviousData`.                           |
-| `UsePaginatedQueryReturn<Query>`          | Type     | Return type of `usePaginatedQuery`: `results`, `status`, `isLoading`, `loadMore`, `error`.                      |
+| `UsePaginatedQueryReturn<Query>`          | Type     | Return type of `usePaginatedQuery`: `results`, `status`, `isLoading`, `loadMore`, `error`.                       |
 | `setupAuth(provider, options?)`           | Function | Set up reactive authentication. Manages `setAuth`/`clearAuth` automatically.                                     |
 | `ConvexAuthProvider`                      | Type     | Auth provider state: `isLoading`, `isAuthenticated`, `fetchAccessToken`.                                         |
 | `SetupAuthOptions`                        | Type     | Options for `setupAuth`: `initialState` for SSR hydration.                                                       |
