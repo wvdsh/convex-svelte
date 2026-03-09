@@ -1,5 +1,13 @@
 # @mmailaender/convex-svelte
 
+## 0.15.2
+
+### Patch Changes
+
+- fix: call `client.setAuth()` synchronously during SSR hydration to prevent auth gap
+  - When SSR confirms authentication, `setupAuth()` now calls `client.setAuth()` immediately during component initialization (before any `$effect` runs). The Convex client's `AuthenticationManager` pauses the WebSocket during token fetch, preventing child `useQuery` subscriptions from hitting an unauthenticated WebSocket and overriding `initialData` with `null`.
+  - The synchronous callback is invalidated once the reactive `$effect` takes over auth management.
+
 ## 0.15.1
 
 ### Patch Changes
