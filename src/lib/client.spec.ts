@@ -168,6 +168,78 @@ describe('setupAuth: providerHasSettled guard on loading reset', () => {
 	});
 });
 
+describe('setupAuth: SSR hydration — synchronous setAuth to prevent auth gap', () => {
+	// Mirrors the synchronous setAuth logic added to setupAuth():
+	//
+	// ```ts
+	// let initialSetAuthActive = false;
+	// if (BROWSER && hasInitialState && options!.initialState!.isAuthenticated) {
+	//     const { fetchAccessToken } = authProvider();
+	//     initialSetAuthActive = true;
+	//     client.setAuth(fetchAccessToken, ...);
+	// }
+	// ```
+	//
+	// Without this, child useQuery $effects create subscriptions on an
+	// unauthenticated WebSocket.  The ConvexClient's AuthenticationManager
+	// pauses the WebSocket during token fetch, so calling setAuth before
+	// effects run prevents unauthenticated query results from overriding
+	// initialData.
+
+	function shouldCallSyncSetAuth(
+		isBrowser: boolean,
+		initialState: { isAuthenticated: boolean } | undefined
+	): boolean {
+		const hasInitialState = initialState !== undefined;
+		return isBrowser && hasInitialState && !!initialState?.isAuthenticated;
+	}
+
+	it('calls setAuth synchronously when SSR confirms authenticated (browser)', () => {
+		expect(shouldCallSyncSetAuth(true, { isAuthenticated: true })).toBe(true);
+	});
+
+	it('does NOT call setAuth synchronously when SSR says not authenticated', () => {
+		expect(shouldCallSyncSetAuth(true, { isAuthenticated: false })).toBe(false);
+	});
+
+	it('does NOT call setAuth synchronously when no initialState provided', () => {
+		expect(shouldCallSyncSetAuth(true, undefined)).toBe(false);
+	});
+
+	it('does NOT call setAuth synchronously during SSR (non-browser)', () => {
+		expect(shouldCallSyncSetAuth(false, { isAuthenticated: true })).toBe(false);
+	});
+
+	it('invalidates sync callback when $effect takes over', () => {
+		// Simulates the handoff: when $effect runs with providerAuth=true,
+		// it sets initialSetAuthActive=false to invalidate the sync callback.
+		let initialSetAuthActive = true;
+		let syncCallbackValue: boolean | null = null;
+		let effectCallbackValue: boolean | null = null;
+
+		// Simulate sync setAuth callback
+		const syncOnChange = (backendIsAuthenticated: boolean) => {
+			if (initialSetAuthActive) {
+				syncCallbackValue = backendIsAuthenticated;
+			}
+		};
+
+		// Simulate effect taking over
+		initialSetAuthActive = false; // effect invalidates sync callback
+		const effectOnChange = (backendIsAuthenticated: boolean) => {
+			effectCallbackValue = backendIsAuthenticated;
+		};
+
+		// Old sync callback fires (stale) — should be ignored
+		syncOnChange(true);
+		expect(syncCallbackValue).toBe(null);
+
+		// Effect callback fires — should update state
+		effectOnChange(true);
+		expect(effectCallbackValue).toBe(true);
+	});
+});
+
 describe('setupAuth: auth state transitions after provider settles', () => {
 	it('provider says authenticated, backend confirms → authenticated', () => {
 		const ctx = deriveAuthContext(true, true);

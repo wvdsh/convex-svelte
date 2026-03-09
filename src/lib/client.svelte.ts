@@ -413,6 +413,24 @@ export function setupAuth(
 	// isConvexAuthenticated, which always changes in the same effect run.
 	let lastProcessedProviderAuth: boolean | undefined;
 
+	// --- Synchronous auth setup for SSR hydration ---
+	// When SSR confirmed authentication, call client.setAuth() immediately
+	// (synchronously, during component initialization, before any $effect).
+	// The ConvexClient's AuthenticationManager pauses the WebSocket during
+	// token fetch. Without this, child useQuery $effects create subscriptions
+	// on an unauthenticated WebSocket, receiving null for auth-gated queries
+	// and overriding initialData — causing a flash of unauthenticated content.
+	let initialSetAuthActive = false;
+	if (BROWSER && hasInitialState && options.initialState?.isAuthenticated) {
+		const { fetchAccessToken } = authProvider();
+		initialSetAuthActive = true;
+		client.setAuth(fetchAccessToken, (backendIsAuthenticated) => {
+			if (initialSetAuthActive) {
+				isConvexAuthenticated = backendIsAuthenticated;
+			}
+		});
+	}
+
 	// --- Reactive effect: watches auth provider state, drives setAuth ---
 	// IMPORTANT: reads of isConvexAuthenticated are wrapped in untrack() so
 	// the effect only re-runs when authProvider() changes, NOT when the
@@ -454,6 +472,9 @@ export function setupAuth(
 		// When the provider says authenticated, wire up client.setAuth
 		// so the Convex backend can confirm the token.
 		if (providerAuth) {
+			// Invalidate the synchronous initial setAuth callback — the $effect
+			// now owns the auth lifecycle.
+			initialSetAuthActive = false;
 			// Transition from "not authenticated" to "loading" immediately
 			// so consumers show a loading state while waiting for the backend
 			// to confirm the token, rather than a flash of unauthenticated.
