@@ -10,7 +10,7 @@
 import type { PaginationStatus } from 'convex/browser';
 import type { FunctionReference, FunctionArgs } from 'convex/server';
 import type { Value } from 'convex/values';
-import { getConvexClient } from '../internal/singleton.js';
+import { getConvexClient, deferSubscription } from '../internal/singleton.js';
 import type { PageItem, PaginatedReturnType, WithoutPaginationOpts } from '../shared/types.js';
 import {
 	PaginatedQueryStateMachine,
@@ -76,37 +76,41 @@ export function createDetachedPaginatedQuery<Query extends FunctionReference<'qu
 		const argsKey = serializeArgsKey(args as Record<string, Value>);
 		machine.onArgsChange(argsKey);
 
-		// Create subscription
-		const unsubscribe = client.onPaginatedUpdate_experimental(
-			query,
-			args,
-			{ initialNumItems: options.initialNumItems },
-			() => {
-				const current = unsubscribe.getCurrentValue?.();
-				if (!current) return;
+		// Defer subscription until setupAuth (or setupConvex for no-auth apps)
+		// calls flushDeferredSubscriptions(). See query-detached.svelte.ts.
+		deferSubscription(() => {
+			// Create subscription
+			const unsubscribe = client.onPaginatedUpdate_experimental(
+				query,
+				args,
+				{ initialNumItems: options.initialNumItems },
+				() => {
+					const current = unsubscribe.getCurrentValue?.();
+					if (!current) return;
+					machine.onUpdate({
+						results: current.results as PageItem<Query>[],
+						status: current.status,
+						loadMore: (numItems: number) => current.loadMore(numItems)
+					});
+					syncState();
+				},
+				(e: Error) => {
+					machine.onError(e);
+					syncState();
+				}
+			);
+
+			// Check for synchronously available cached value
+			const current = unsubscribe.getCurrentValue?.();
+			if (current) {
 				machine.onUpdate({
 					results: current.results as PageItem<Query>[],
 					status: current.status,
 					loadMore: (numItems: number) => current.loadMore(numItems)
 				});
 				syncState();
-			},
-			(e: Error) => {
-				machine.onError(e);
-				syncState();
 			}
-		);
-
-		// Check for synchronously available cached value
-		const current = unsubscribe.getCurrentValue?.();
-		if (current) {
-			machine.onUpdate({
-				results: current.results as PageItem<Query>[],
-				status: current.status,
-				loadMore: (numItems: number) => current.loadMore(numItems)
-			});
-			syncState();
-		}
+		});
 	}
 
 	return {
