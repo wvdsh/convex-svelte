@@ -1,5 +1,15 @@
 # @mmailaender/convex-svelte
 
+## 0.16.0
+
+### Minor Changes
+
+- Features:
+  - **`convexLoadPaginated()`** — SSR-compatible paginated query loading. Fetches the first page on the server and automatically upgrades to a live paginated subscription on the client, with `loadMore()` support for incremental loading. Works with the SvelteKit transport hook, mirroring the `convexLoad()` pattern for paginated queries.
+
+- Fixes:
+  - Add deferred subscription queue to prevent auth gap between transport.decode and setupAuth
+
 ## 0.15.4
 
 ### Patch Changes

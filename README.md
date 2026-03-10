@@ -20,7 +20,7 @@ Receive live updates to Convex query subscriptions and call mutations and action
   - [Async Queries (experimental)](#async-queries-experimental)
   - [Authentication](#authentication)
 - [SvelteKit](#sveltekit)
-  - [SSR with convexLoad (recommended)](#ssr-with-convexload-recommended)
+  - [SSR with convexLoad / convexLoadPaginated (recommended)](#ssr-with-convexload--convexloadpaginated-recommended)
   - [SSR with initialData (manual alternative)](#ssr-with-initialdata-manual-alternative)
   - [Server Helpers](#server-helpers)
 - [Deploying](#deploying)
@@ -521,20 +521,24 @@ Import from `@mmailaender/convex-svelte/sveltekit` for SvelteKit-specific featur
 
 > **New to SSR with Convex?** See [Why SSR with Convex?](#why-ssr-with-convex) for a detailed comparison of SSR vs client-side rendering performance.
 
-### SSR with convexLoad (recommended)
+### SSR with convexLoad / convexLoadPaginated (recommended)
 
-`convexLoad()` fetches data on the server and automatically upgrades to a live subscription on the client. No manual `initialData` wiring needed.
+`convexLoad()` and `convexLoadPaginated()` fetch data on the server and automatically upgrade to live subscriptions on the client. No manual `initialData` wiring needed. Use `convexLoad()` for regular queries and `convexLoadPaginated()` for paginated queries.
 
-#### convexLoad Setup
+#### Setup
 
-Add `initConvex()` and the transport hook to `hooks.ts` (universal hooks — runs on both server and client). `initConvex()` creates the `ConvexClient` singleton early so the transport decoder can upgrade SSR data to live subscriptions. `setupConvex()` in your root layout automatically reuses this singleton.
+Add `initConvex()` and the transport hooks to `hooks.ts` (universal hooks — runs on both server and client). `initConvex()` creates the `ConvexClient` singleton early so the transport decoder can upgrade SSR data to live subscriptions. `setupConvex()` in your root layout automatically reuses this singleton.
+
+If you only use `convexLoad()`, you only need the `ConvexLoadResult` transport. Add `ConvexLoadPaginatedResult` when using `convexLoadPaginated()`.
 
 ```ts
 // hooks.ts
 import {
 	initConvex,
 	encodeConvexLoad,
-	decodeConvexLoad
+	decodeConvexLoad,
+	encodeConvexLoadPaginated,
+	decodeConvexLoadPaginated
 } from '@mmailaender/convex-svelte/sveltekit';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 
@@ -544,11 +548,16 @@ export const transport = {
 	ConvexLoadResult: {
 		encode: encodeConvexLoad,
 		decode: decodeConvexLoad
+	},
+	// Only needed if you use convexLoadPaginated()
+	ConvexLoadPaginatedResult: {
+		encode: encodeConvexLoadPaginated,
+		decode: decodeConvexLoadPaginated
 	}
 };
 ```
 
-#### Usage
+#### Usage with convexLoad
 
 ```ts
 // +page.ts (universal load function)
@@ -582,13 +591,66 @@ export const load = async () => ({
 
 The result has the same shape as `useQuery()` — `.data`, `.isLoading`, `.error`, `.isStale` — and is reactive. On first load, data arrives via SSR (no loading flash). After hydration, a live WebSocket subscription takes over automatically.
 
-#### Authenticated fetches
+#### Usage with convexLoadPaginated
 
-For authenticated server-side fetches, pass a token:
+`convexLoadPaginated()` works the same way but for paginated queries. It fetches the first page on the server and upgrades to a live paginated subscription on the client — with `loadMore()` support for incremental loading.
 
 ```ts
+// +page.ts (universal load function)
+import { convexLoadPaginated } from '@mmailaender/convex-svelte/sveltekit';
+import { api } from '$convex/_generated/api';
+
+export const load = async () => ({
+	messages: await convexLoadPaginated(
+		api.messages.paginatedList,
+		{ muteWords: [] },
+		{ initialNumItems: 10 }
+	)
+});
+```
+
+```svelte
+<!-- +page.svelte -->
+<script lang="ts">
+	let { data } = $props();
+	const messages = $derived(data.messages);
+</script>
+
+{#if messages.isLoading}
+	Loading...
+{:else if messages.error}
+	Error: {messages.error.message}
+{:else}
+	<ul>
+		{#each messages.results as message}
+			<li>{message.author}: {message.body}</li>
+		{/each}
+	</ul>
+	{#if messages.status === 'CanLoadMore'}
+		<button onclick={() => messages.loadMore(10)}>Load more</button>
+	{/if}
+{/if}
+```
+
+The result has the same shape as `usePaginatedQuery()` — `.results`, `.status`, `.isLoading`, `.error`, `.loadMore()` — and is reactive. On first load, the first page arrives via SSR (no loading flash). After hydration, a live WebSocket subscription takes over and `loadMore()` becomes functional.
+
+#### Authenticated fetches
+
+For authenticated server-side fetches, pass a token in the options:
+
+```ts
+// convexLoad
 export const load = async ({ locals }) => ({
 	tasks: await convexLoad(api.tasks.get, {}, { token: locals.token })
+});
+
+// convexLoadPaginated
+export const load = async ({ locals }) => ({
+	messages: await convexLoadPaginated(
+		api.messages.paginatedList,
+		{ muteWords: [] },
+		{ initialNumItems: 10, token: locals.token }
+	)
 });
 ```
 
@@ -771,7 +833,7 @@ With co-location, the server→Convex hop is negligible (~1–5ms), and SSR beco
 
 ### SSR is easy with the SvelteKit transport hook
 
-A common concern is that SSR adds boilerplate. With the [`convexLoad` transport hook](#ssr-with-convexload-recommended), it's minimal — fetch in your load function, use the result directly in the template. No manual `initialData` wiring needed:
+A common concern is that SSR adds boilerplate. With the [`convexLoad` transport hook](#ssr-with-convexload--convexloadpaginated-recommended), it's minimal — fetch in your load function, use the result directly in the template. No manual `initialData` wiring needed:
 
 ```ts
 // +page.ts
@@ -822,12 +884,15 @@ Import from `@mmailaender/convex-svelte`:
 
 Import from `@mmailaender/convex-svelte/sveltekit`:
 
-| Export                              | Kind     | Description                                                                                           |
-| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `initConvex(url, options?)`         | Function | Create the `ConvexClient` singleton early. Only needed for [convexLoad SSR setup](#convexload-setup). |
-| `getConvexUrl()`                    | Function | Retrieve the deployment URL set by `initConvex()` or `setupConvex()`.                                 |
-| `convexLoad(query, args, options?)` | Function | Fetch data server-side, upgrade to live subscription on client.                                       |
-| `encodeConvexLoad`                  | Function | Transport encoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
-| `decodeConvexLoad`                  | Function | Transport decoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
-| `createConvexHttpClient(options?)`  | Function | Create a `ConvexHttpClient` for server-side use.                                                      |
-| `CreateConvexHttpClientOptions`     | Type     | Options for `createConvexHttpClient`: `url`, `token`, `options`.                                      |
+| Export                                      | Kind     | Description                                                                                           |
+| ------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `initConvex(url, options?)`                 | Function | Create the `ConvexClient` singleton early. Only needed for [convexLoad SSR setup](#convexload-setup). |
+| `getConvexUrl()`                            | Function | Retrieve the deployment URL set by `initConvex()` or `setupConvex()`.                                 |
+| `convexLoad(query, args, options?)`         | Function | Fetch data server-side, upgrade to live subscription on client.                                       |
+| `encodeConvexLoad`                          | Function | Transport encoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
+| `decodeConvexLoad`                          | Function | Transport decoder — use in `hooks.ts` (see [convexLoad Setup](#convexload-setup)).                    |
+| `convexLoadPaginated(query, args, options)` | Function | Fetch first page server-side, upgrade to live paginated subscription on client.                       |
+| `encodeConvexLoadPaginated`                 | Function | Paginated transport encoder — use in `hooks.ts`.                                                      |
+| `decodeConvexLoadPaginated`                 | Function | Paginated transport decoder — use in `hooks.ts`.                                                      |
+| `createConvexHttpClient(options?)`          | Function | Create a `ConvexHttpClient` for server-side use.                                                      |
+| `CreateConvexHttpClientOptions`             | Type     | Options for `createConvexHttpClient`: `url`, `token`, `options`.                                      |

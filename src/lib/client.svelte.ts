@@ -10,7 +10,11 @@ import {
 import type { Value } from 'convex/values';
 import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
-import { getSingletonClient, setSingleton } from './internal/singleton.js';
+import {
+	getSingletonClient,
+	setSingleton,
+	flushDeferredSubscriptions
+} from './internal/singleton.js';
 
 const _contextKey = '$$_convexClient';
 
@@ -45,6 +49,13 @@ export const setupConvex = (url: string, options: ConvexClientOptions = {}): Con
 	}
 
 	setConvexClientContext(client);
+
+	// Fallback: flush deferred subscriptions for apps that don't call setupAuth.
+	// If setupAuth IS called (which flushes synchronously), this is a no-op.
+	if (BROWSER) {
+		queueMicrotask(() => flushDeferredSubscriptions());
+	}
+
 	$effect(() => () => client.close());
 	return client;
 };
@@ -427,6 +438,14 @@ export function setupAuth(
 		client.setAuth(fetchAccessToken, (backendIsAuthenticated: boolean) => {
 			isConvexAuthenticated = backendIsAuthenticated;
 		});
+	}
+
+	// Flush subscriptions deferred by transport.decode (createDetachedQuery).
+	// Must come AFTER client.setAuth() (if called) so the WebSocket is paused
+	// before any subscription fires. For unauthenticated SSR or no initialState,
+	// subscriptions fire immediately without auth (matching SSR behavior).
+	if (BROWSER) {
+		flushDeferredSubscriptions();
 	}
 
 	// --- Reactive effect: watches auth provider state, drives setAuth ---
