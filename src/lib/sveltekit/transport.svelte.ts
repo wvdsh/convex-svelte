@@ -1,5 +1,5 @@
 /**
- * SSR bridge — convexLoad() + transport encode/decode.
+ * SSR bridge — convexLoad() / convexLoadPaginated() + transport encode/decode.
  *
  * On the server, convexLoad fetches via ConvexHttpClient (auth-aware if token provided).
  * On the client, transport.decode upgrades it to a live subscription.
@@ -10,6 +10,11 @@ import { getFunctionName, makeFunctionReference } from 'convex/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { getConvexUrl } from '../internal/singleton.js';
 import { createDetachedQuery, type DetachedQueryResult } from './query-detached.svelte.js';
+import {
+	createDetachedPaginatedQuery,
+	type DetachedPaginatedQueryResult
+} from './paginated-query-detached.svelte.js';
+import type { PageItem, PaginatedReturnType, WithoutPaginationOpts } from '../shared/types.js';
 
 const IS_BROWSER = typeof globalThis.document !== 'undefined';
 
@@ -129,4 +134,165 @@ export function decodeConvexLoad(encoded: {
 }): DetachedQueryResult<FunctionReference<'query'>> {
 	const ref = makeFunctionReference<'query'>(encoded.refName);
 	return createDetachedQuery(ref, encoded.args, encoded.data);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Paginated SSR bridge — convexLoadPaginated() + transport encode/decode
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Marker class for paginated SSR results.
+ * Wraps the first page of server-fetched data along with query metadata
+ * so transport.decode can upgrade it to a live paginated subscription.
+ */
+export class ConvexLoadPaginatedResult<T = unknown> {
+	readonly __convexLoadPaginated = true;
+
+	/** Always `false` — first page was already fetched on the server. */
+	readonly isLoading = false;
+
+	/** Always `undefined` — the server fetch succeeded. */
+	readonly error: undefined = undefined;
+
+	constructor(
+		public readonly refName: string,
+		public readonly args: Record<string, unknown>,
+		public readonly initialNumItems: number,
+		public readonly data: PaginatedReturnType<T>
+	) {}
+
+	/** Convenience: the first page of results. */
+	get results(): T[] {
+		return this.data.page;
+	}
+
+	/** Convenience: pagination status derived from server data. */
+	get status(): string {
+		return this.data.isDone ? 'Exhausted' : 'CanLoadMore';
+	}
+
+	/** No-op on the server — loadMore only works after client hydration. */
+	loadMore(): boolean {
+		return false;
+	}
+}
+
+/**
+ * Fetch the first page of a paginated Convex query for SSR, with live upgrade on the client.
+ *
+ * - **Server (SSR):** fetches via `ConvexHttpClient`, returns `ConvexLoadPaginatedResult`.
+ *   The SvelteKit transport hook decodes it into a live paginated subscription on the client.
+ * - **Client (navigation):** fetches initial page, then creates a live paginated subscription
+ *   via `createDetachedPaginatedQuery()`.
+ *
+ * @example
+ * ```ts
+ * // +page.ts (universal load function)
+ * import { convexLoadPaginated } from '@mmailaender/convex-svelte/sveltekit';
+ * import { api } from '$convex/_generated/api';
+ *
+ * export const load = async () => ({
+ *   messages: await convexLoadPaginated(api.messages.paginatedList, { muteWords: [] }, {
+ *     initialNumItems: 10
+ *   })
+ * });
+ * ```
+ *
+ * @param ref - A FunctionReference to a paginated query.
+ * @param args - Query arguments (without `paginationOpts` — managed automatically).
+ * @param options - `{ initialNumItems }` (required), optional `{ token }` for auth.
+ */
+export async function convexLoadPaginated<Query extends FunctionReference<'query'>>(
+	ref: Query,
+	args: WithoutPaginationOpts<FunctionArgs<Query>>,
+	options: { initialNumItems: number; token?: string }
+): Promise<DetachedPaginatedQueryResult<Query>> {
+	const httpClient = new ConvexHttpClient(getConvexUrl());
+
+	if (!IS_BROWSER && options.token) {
+		httpClient.setAuth(options.token);
+	}
+
+	// Fetch the first page via HTTP
+	const fullArgs = {
+		...args,
+		paginationOpts: { numItems: options.initialNumItems, cursor: null }
+	} as FunctionArgs<Query>;
+
+	const data = (await httpClient.query(ref, fullArgs)) as PaginatedReturnType<PageItem<Query>>;
+
+	if (IS_BROWSER) {
+		// Client-side navigation: create live paginated subscription with initial data
+		return createDetachedPaginatedQuery(ref, args, {
+			initialNumItems: options.initialNumItems,
+			initialData: data
+		});
+	}
+
+	// Server-side: wrap in marker class for transport
+	const name = getFunctionName(ref);
+	return new ConvexLoadPaginatedResult(
+		name,
+		args as Record<string, unknown>,
+		options.initialNumItems,
+		data
+	) as unknown as DetachedPaginatedQueryResult<Query>;
+}
+
+/**
+ * Encode a `ConvexLoadPaginatedResult` for serialization across the SSR boundary.
+ * Use in SvelteKit's `transport` hook (`hooks.ts`).
+ *
+ * @example
+ * ```ts
+ * // hooks.ts
+ * import {
+ *   encodeConvexLoad, decodeConvexLoad,
+ *   encodeConvexLoadPaginated, decodeConvexLoadPaginated
+ * } from '@mmailaender/convex-svelte/sveltekit';
+ *
+ * export const transport = {
+ *   ConvexLoadResult: { encode: encodeConvexLoad, decode: decodeConvexLoad },
+ *   ConvexLoadPaginatedResult: { encode: encodeConvexLoadPaginated, decode: decodeConvexLoadPaginated }
+ * };
+ * ```
+ */
+export function encodeConvexLoadPaginated(value: unknown):
+	| false
+	| {
+			refName: string;
+			args: Record<string, unknown>;
+			initialNumItems: number;
+			data: unknown;
+	  } {
+	if (
+		value instanceof ConvexLoadPaginatedResult ||
+		(value != null && typeof value === 'object' && '__convexLoadPaginated' in value)
+	) {
+		const v = value as ConvexLoadPaginatedResult;
+		return {
+			refName: v.refName,
+			args: v.args,
+			initialNumItems: v.initialNumItems,
+			data: v.data
+		};
+	}
+	return false;
+}
+
+/**
+ * Decode a serialized `ConvexLoadPaginatedResult` into a live paginated subscription.
+ * Uses `createDetachedPaginatedQuery` — works outside component context (transport.decode).
+ */
+export function decodeConvexLoadPaginated(encoded: {
+	refName: string;
+	args: Record<string, unknown>;
+	initialNumItems: number;
+	data: unknown;
+}): DetachedPaginatedQueryResult<FunctionReference<'query'>> {
+	const ref = makeFunctionReference<'query'>(encoded.refName);
+	return createDetachedPaginatedQuery(ref, encoded.args, {
+		initialNumItems: encoded.initialNumItems,
+		initialData: encoded.data as PaginatedReturnType<unknown>
+	});
 }
