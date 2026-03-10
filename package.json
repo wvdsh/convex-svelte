@@ -5,7 +5,7 @@
 		"Convex, Inc. <no-reply@convex.dev>",
 		"Micha Mailaender"
 	],
-	"version": "0.15.4",
+	"version": "0.16.0",
 	"license": "Apache-2.0",
 	"homepage": "https://github.com/mmailaender/convex-svelte",
 	"repository": {
@@ -26,7 +26,8 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"test:unit": "vitest run",
-		"test:e2e": "playwright test",
+		"playwright:install": "node --eval \"const { spawnSync } = require('node:child_process'); const { homedir } = require('node:os'); const { join } = require('node:path'); const env = { ...process.env, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), '.cache', 'ms-playwright') }; const cmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'; const result = spawnSync(cmd, ['exec', 'playwright', 'install', 'chromium'], { stdio: 'inherit', env }); process.exit(result.status ?? 1);\"",
+		"test:e2e": "node --eval \"const { spawnSync } = require('node:child_process'); const { homedir } = require('node:os'); const { join } = require('node:path'); const env = { ...process.env, PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), '.cache', 'ms-playwright') }; const cmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'; const result = spawnSync(cmd, ['exec', 'playwright', 'test'], { stdio: 'inherit', env }); process.exit(result.status ?? 1);\"",
 		"test": "pnpm test:unit && pnpm test:e2e",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
