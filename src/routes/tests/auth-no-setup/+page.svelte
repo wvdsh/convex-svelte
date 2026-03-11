@@ -10,12 +10,12 @@
 	}
 </script>
 
-<section>
-	<h1>Auth No Setup Test</h1>
+<section class="space-y-4">
+	<h1 class="text-2xl font-bold text-gray-900">Auth No Setup Test</h1>
 
 	{#if errorMessage}
-		<p data-testid="error">{errorMessage}</p>
+		<p data-testid="error" class="text-sm text-red-700">{errorMessage}</p>
 	{:else}
-		<p data-testid="no-error">No error thrown</p>
+		<p data-testid="no-error" class="text-sm text-green-700">No error thrown</p>
 	{/if}
 </section>

@@ -19,35 +19,48 @@
 	}
 </script>
 
-<section>
-	<h1>This query always errors</h1>
+<section class="space-y-4">
+	<h1 class="text-2xl font-bold text-gray-900">This query always errors</h1>
 
 	{#if fooData}
-		<p>query has data.</p>
+		<p class="text-sm text-green-700">query has data.</p>
 	{/if}
 	{#if fooError}
-		<p>query errored.</p>
+		<p class="text-sm text-red-700">query errored.</p>
 	{/if}
 	{#if fooIsLoading}
-		<p>query is loading.</p>
+		<p class="text-sm text-blue-700">query is loading.</p>
 	{/if}
 	{#if fooError && fooIsLoading}
-		<p>{fail('query errored and is loading. (impossible state unless useStale were true)')}</p>
+		<p class="text-sm text-red-700">
+			{fail('query errored and is loading. (impossible state unless useStale were true)')}
+		</p>
 	{/if}
 	{#if fooData && fooIsLoading}
-		<p>{fail('query has data and is loading. (impossible state unless useStale were true)')}</p>
+		<p class="text-sm text-red-700">
+			{fail('query has data and is loading. (impossible state unless useStale were true)')}
+		</p>
 	{/if}
 	{#if fooData && fooError}
-		<p>query errored and has data. (impossible state)</p>
+		<p class="text-sm text-red-700">query errored and has data. (impossible state)</p>
 	{/if}
 	{#if !fooIsLoading && !fooError && !fooData}
-		<p>{fail('query is not loading and did not error and has no data. (impossible state)')}</p>
+		<p class="text-sm text-red-700">
+			{fail('query is not loading and did not error and has no data. (impossible state)')}
+		</p>
 	{/if}
 	{#if fooIsLoading && fooError && fooData}
-		<p>{fail('query is loading and has error and has data. (impossible state)')}</p>
+		<p class="text-sm text-red-700">
+			{fail('query is loading and has error and has data. (impossible state)')}
+		</p>
 	{/if}
 
-	{#if fooError}<p>error message:</p>
-		<code><pre> {fooError.message} </pre></code>
+	{#if fooError}
+		<div class="rounded-lg border border-red-200 bg-red-50 p-4">
+			<p class="mb-2 text-sm font-medium text-red-800">error message:</p>
+			<code class="block overflow-x-auto rounded bg-red-100 p-2 font-mono text-xs text-red-900"
+				><pre>{fooError.message}</pre></code
+			>
+		</div>
 	{/if}
 </section>

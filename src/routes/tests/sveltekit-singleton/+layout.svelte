@@ -15,8 +15,8 @@
 	const moduleClient = getConvexClient();
 </script>
 
-<div data-testid="singleton-check">
-	<p data-testid="same-client">
+<div data-testid="singleton-check" class="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+	<p data-testid="same-client" class="text-sm text-gray-600">
 		sameClient: {earlyClient === layoutClient && layoutClient === moduleClient}
 	</p>
 </div>
