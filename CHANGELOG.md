@@ -1,5 +1,12 @@
 # @mmailaender/convex-svelte
 
+## 0.17.0
+
+### Minor Changes
+
+- Features:
+  - **`useMutation()`** / **`useAction()`** — thin wrappers that return callable functions for mutations and actions. They work in `.svelte` components and plain `.ts` / `.js` files.
+
 ## 0.16.0
 
 ### Minor Changes
