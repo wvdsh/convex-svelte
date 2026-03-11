@@ -31,7 +31,7 @@
 		"test": "pnpm test:unit && pnpm test:e2e",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
-		"release": "changeset publish"
+		"release": "changeset publish && git push --follow-tags"
 	},
 	"files": [
 		"dist",
