@@ -149,16 +149,14 @@ When a query is skipped, `isLoading` will be `false`, `error` will be `null`, an
 
 ### Mutations & Actions
 
-Use `getConvexClient()` or `useConvexClient()` to get the [`ConvexClient`](https://docs.convex.dev/api/classes/browser.ConvexClient) and call mutations or actions. Both return a `Promise` with the result.
-
-> Need to call mutations from a `.ts` utility file? See [Client Access](#client-access).
+Use `useMutation()` and `useAction()` to get callable functions for your Convex mutations and actions. Both use the module-level singleton (`getConvexClient()`) internally, so they work in `.svelte` components **and** plain `.ts` / `.js` files — anywhere after `setupConvex()` has been called.
 
 ```svelte
 <script lang="ts">
-	import { useConvexClient } from '@mmailaender/convex-svelte';
+	import { useMutation } from '@mmailaender/convex-svelte';
 	import { api } from '../../convex/_generated/api.js';
 
-	const client = useConvexClient();
+	const sendMessage = useMutation(api.messages.send);
 
 	let toSend = $state('');
 	let author = $state('me');
@@ -167,7 +165,7 @@ Use `getConvexClient()` or `useConvexClient()` to get the [`ConvexClient`](https
 		event.preventDefault();
 
 		const data = Object.fromEntries(new FormData(event.target as HTMLFormElement).entries());
-		client.mutation(api.messages.send, {
+		sendMessage({
 			author: data.author as string,
 			body: data.body as string
 		});
@@ -184,23 +182,26 @@ Use `getConvexClient()` or `useConvexClient()` to get the [`ConvexClient`](https
 Actions are similar to mutations but can have side effects like calling third-party APIs:
 
 ```ts
-const uploadUrl = await client.action(api.files.generateUploadUrl, {});
+import { useAction } from '@mmailaender/convex-svelte';
+import { api } from '../../convex/_generated/api.js';
+
+const generateUploadUrl = useAction(api.files.generateUploadUrl);
+const uploadUrl = await generateUploadUrl({});
 ```
 
 #### Optimistic updates
 
-Optimistic updates let you update the UI immediately when a mutation is called, without waiting for the server to respond. Pass an `optimisticUpdate` callback in the mutation options to update the local query cache.
+Optimistic updates let you update the UI immediately when a mutation is called, without waiting for the server to respond. Pass an `optimisticUpdate` callback in the mutation options at the call site to update the local query cache.
 
 ```svelte
 <script lang="ts">
-	import { useConvexClient } from '@mmailaender/convex-svelte';
+	import { useMutation } from '@mmailaender/convex-svelte';
 	import { api } from '../../convex/_generated/api.js';
 
-	const client = useConvexClient();
+	const updateUser = useMutation(api.user.update);
 
-	async function updateUser() {
-		await client.mutation(
-			api.user.update,
+	async function handleUpdate() {
+		await updateUser(
 			{ name: 'John Doe' },
 			{
 				optimisticUpdate: (store) => {
@@ -237,29 +238,24 @@ This is the recommended way to access the client outside of the layout where `se
 | **Works in**  | Anywhere (`.ts`, `.svelte`, hooks) | Svelte components only |
 | **Mechanism** | Module singleton                   | Svelte `getContext()`  |
 
-#### Using the client in utility files
+#### Using mutations in utility files
 
-Keep business logic in separate `.ts` files and use `getConvexClient()` to access the Convex client. You can call mutations, actions, and one-time queries:
+`useMutation()` and `useAction()` work in plain `.ts` files too, since they use the module-level singleton:
 
 ```ts
 // src/lib/services/tasks.ts
-import { getConvexClient } from '@mmailaender/convex-svelte';
+import { useMutation } from '@mmailaender/convex-svelte';
 import { api } from '../convex/_generated/api.js';
 
+const createTaskMutation = useMutation(api.tasks.create);
+const completeTaskMutation = useMutation(api.tasks.complete);
+
 export async function createTask(text: string) {
-	const client = getConvexClient();
-	await client.mutation(api.tasks.create, { text });
+	await createTaskMutation({ text });
 }
 
 export async function completeTask(id: string) {
-	const client = getConvexClient();
-	await client.mutation(api.tasks.complete, { id });
-}
-
-// One-time query (no WebSocket subscription, just a single fetch)
-export async function getTaskCount() {
-	const client = getConvexClient();
-	return await client.query(api.tasks.count, {});
+	await completeTaskMutation({ id });
 }
 ```
 
@@ -282,6 +278,19 @@ Then call these functions from any component without plumbing the client through
 	<input bind:value={text} />
 	<button type="submit">Add</button>
 </form>
+```
+
+For advanced use cases like one-time queries, use `getConvexClient()` directly:
+
+```ts
+import { getConvexClient } from '@mmailaender/convex-svelte';
+import { api } from '../convex/_generated/api.js';
+
+// One-time query (no WebSocket subscription, just a single fetch)
+export async function getTaskCount() {
+	const client = getConvexClient();
+	return await client.query(api.tasks.count, {});
+}
 ```
 
 > **Note**: The `.svelte.ts` file extension enables Svelte 5 runes (`$state`, `$derived`, `$effect`) but does **not** make `getContext()` work outside components. If you need the client in a plain `.ts` file, use `getConvexClient()`, not `useConvexClient()`.

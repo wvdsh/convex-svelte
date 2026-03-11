@@ -1,6 +1,6 @@
 import { getContext, setContext, untrack } from 'svelte';
 import { BROWSER } from 'esm-env';
-import { ConvexClient, type ConvexClientOptions } from 'convex/browser';
+import { ConvexClient, type ConvexClientOptions, type MutationOptions } from 'convex/browser';
 import {
 	type FunctionReference,
 	type FunctionArgs,
@@ -11,6 +11,7 @@ import type { Value } from 'convex/values';
 import { argsKeyEqual, jsonEqualArgs, SKIP, type Skip } from './shared/args.js';
 import { parseArgsWithSkip } from './internal/args.svelte.js';
 import {
+	getConvexClient,
 	getSingletonClient,
 	setSingleton,
 	flushDeferredSubscriptions
@@ -630,4 +631,61 @@ export function useAuth(): UseAuthReturn {
 			return authContext.isAuthenticated;
 		}
 	};
+}
+
+/* -------------------------------------------------------------------------- */
+/*                      useMutation / useAction wrappers                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Get a callable function for a Convex mutation.
+ *
+ * Uses the module-level singleton (`getConvexClient()`), so it works in
+ * `.svelte` components **and** plain `.ts` / `.js` files — anywhere after
+ * `setupConvex()` (or `initConvex()`) has been called.
+ *
+ * ```svelte
+ * const sendMessage = useMutation(api.messages.send);
+ * await sendMessage({ body: "hi" });
+ *
+ * // With optimistic update (at call site):
+ * await sendMessage({ body: "hi" }, {
+ *   optimisticUpdate: (store) => {
+ *     store.setQuery(api.messages.list, { muteWords: [] }, [...]);
+ *   }
+ * });
+ * ```
+ *
+ * @param mutation - A FunctionReference for the mutation to run.
+ * @returns A function `(args, options?) => Promise<ReturnType>`.
+ */
+export function useMutation<Mutation extends FunctionReference<'mutation'>>(
+	mutation: Mutation
+): (
+	args: FunctionArgs<Mutation>,
+	options?: MutationOptions
+) => Promise<FunctionReturnType<Mutation>> {
+	return (args: FunctionArgs<Mutation>, options?: MutationOptions) =>
+		getConvexClient().mutation(mutation, args, options);
+}
+
+/**
+ * Get a callable function for a Convex action.
+ *
+ * Uses the module-level singleton (`getConvexClient()`), so it works in
+ * `.svelte` components **and** plain `.ts` / `.js` files — anywhere after
+ * `setupConvex()` (or `initConvex()`) has been called.
+ *
+ * ```svelte
+ * const generateUrl = useAction(api.files.generateUploadUrl);
+ * const url = await generateUrl({});
+ * ```
+ *
+ * @param action - A FunctionReference for the action to run.
+ * @returns A function `(args) => Promise<ReturnType>`.
+ */
+export function useAction<Action extends FunctionReference<'action'>>(
+	action: Action
+): (args: FunctionArgs<Action>) => Promise<FunctionReturnType<Action>> {
+	return (args: FunctionArgs<Action>) => getConvexClient().action(action, args);
 }

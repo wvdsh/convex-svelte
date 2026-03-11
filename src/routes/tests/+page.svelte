@@ -67,6 +67,11 @@
 					title: 'Optimistic Update',
 					path: '/tests/optimistic-update',
 					description: 'Tests optimistic updates with mutations'
+				},
+				{
+					title: 'useMutation / useAction',
+					path: '/tests/use-mutation-action',
+					description: 'Tests useMutation and useAction wrapper functions'
 				}
 			]
 		},

@@ -4,6 +4,8 @@ export {
 	useConvexClient,
 	setupConvex,
 	useQuery,
+	useMutation,
+	useAction,
 	setConvexClientContext,
 	setupAuth,
 	useAuth,
