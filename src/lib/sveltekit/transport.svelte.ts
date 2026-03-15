@@ -8,7 +8,7 @@
 import type { FunctionReference, FunctionArgs } from 'convex/server';
 import { getFunctionName, makeFunctionReference } from 'convex/server';
 import { ConvexHttpClient } from 'convex/browser';
-import { getConvexUrl } from '../internal/singleton.js';
+import { getConvexUrl, getConvexClient } from '../internal/singleton.js';
 import { createDetachedQuery, type DetachedQueryResult } from './query-detached.svelte.js';
 import {
 	createDetachedPaginatedQuery,
@@ -70,20 +70,20 @@ export async function convexLoad<Query extends FunctionReference<'query'>>(
 	args: FunctionArgs<Query>,
 	options?: { token?: string }
 ): Promise<DetachedQueryResult<Query>> {
-	const httpClient = new ConvexHttpClient(getConvexUrl());
-
-	if (!IS_BROWSER && options?.token) {
-		httpClient.setAuth(options.token);
-	}
-
 	if (IS_BROWSER) {
-		// Client-side navigation: fetch initial data, then create live subscription
-		const initialData = await httpClient.query(ref, args);
+		// Client-side navigation: use the authenticated singleton ConvexClient
+		// for the initial fetch, then create a live subscription.
+		const client = getConvexClient();
+		const initialData = await client.query(ref, args);
 		return createDetachedQuery(ref, args, initialData) as DetachedQueryResult<Query>;
 	}
 
 	// Server-side: HTTP fetch, wrap in ConvexLoadResult for transport.
 	// transport.decode replaces this with a DetachedQueryResult on the client.
+	const httpClient = new ConvexHttpClient(getConvexUrl());
+	if (options?.token) {
+		httpClient.setAuth(options.token);
+	}
 	const data = await httpClient.query(ref, args);
 	const name = getFunctionName(ref);
 	return new ConvexLoadResult(
@@ -207,29 +207,28 @@ export async function convexLoadPaginated<Query extends FunctionReference<'query
 	args: WithoutPaginationOpts<FunctionArgs<Query>>,
 	options: { initialNumItems: number; token?: string }
 ): Promise<DetachedPaginatedQueryResult<Query>> {
-	const httpClient = new ConvexHttpClient(getConvexUrl());
-
-	if (!IS_BROWSER && options.token) {
-		httpClient.setAuth(options.token);
-	}
-
-	// Fetch the first page via HTTP
+	// Fetch the first page
 	const fullArgs = {
 		...args,
 		paginationOpts: { numItems: options.initialNumItems, cursor: null }
 	} as FunctionArgs<Query>;
 
-	const data = (await httpClient.query(ref, fullArgs)) as PaginatedReturnType<PageItem<Query>>;
-
 	if (IS_BROWSER) {
-		// Client-side navigation: create live paginated subscription with initial data
+		// Client-side navigation: use the authenticated singleton ConvexClient
+		const client = getConvexClient();
+		const data = (await client.query(ref, fullArgs)) as PaginatedReturnType<PageItem<Query>>;
 		return createDetachedPaginatedQuery(ref, args, {
 			initialNumItems: options.initialNumItems,
 			initialData: data
 		});
 	}
 
-	// Server-side: wrap in marker class for transport
+	// Server-side: HTTP fetch, wrap in marker class for transport
+	const httpClient = new ConvexHttpClient(getConvexUrl());
+	if (options.token) {
+		httpClient.setAuth(options.token);
+	}
+	const data = (await httpClient.query(ref, fullArgs)) as PaginatedReturnType<PageItem<Query>>;
 	const name = getFunctionName(ref);
 	return new ConvexLoadPaginatedResult(
 		name,
