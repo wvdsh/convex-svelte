@@ -1,5 +1,11 @@
 # @mmailaender/convex-svelte
 
+## 0.17.1
+
+### Patch Changes
+
+- Fix: Use authenticated singleton ConvexClient for client-side initial fetches in `convexLoad()` and `convexLoadPaginated()` instead of creating new HTTP clients
+
 ## 0.17.0
 
 ### Minor Changes
