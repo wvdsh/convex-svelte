@@ -72,6 +72,35 @@ export function setSingleton(url: string, client: ConvexClient): void {
  *
  * @throws If `initConvex()` or `setupConvex()` has not been called yet.
  */
+// ---------------------------------------------------------------------------
+// Server-side token indirection for AsyncLocalStorage.
+//
+// server-token.ts (server-only) registers a getter via _setServerTokenGetter
+// that reads from AsyncLocalStorage. convexLoad and createConvexHttpClient
+// call _getServerToken() to auto-read the token during SSR — without
+// importing node:async_hooks themselves (which would break in the browser).
+// ---------------------------------------------------------------------------
+let _serverTokenGetter: (() => string | undefined) | null = null;
+
+/**
+ * Register a function that retrieves the current request's auth token.
+ * Called once by `server-token.ts` on import (side-effect registration).
+ * @internal
+ */
+export function _setServerTokenGetter(getter: () => string | undefined): void {
+	_serverTokenGetter = getter;
+}
+
+/**
+ * Read the auth token for the current request, if available.
+ * Returns `undefined` when `withServerConvexToken` is not active or
+ * when the server-token module has not been imported.
+ * @internal
+ */
+export function _getServerToken(): string | undefined {
+	return _serverTokenGetter?.();
+}
+
 export function getConvexClient(): ConvexClient {
 	if (!_singletonClient) {
 		throw new Error('Convex client not initialized. Call setupConvex() or initConvex() first.');

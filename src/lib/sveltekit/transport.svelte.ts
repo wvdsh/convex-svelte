@@ -8,7 +8,7 @@
 import type { FunctionReference, FunctionArgs } from 'convex/server';
 import { getFunctionName, makeFunctionReference } from 'convex/server';
 import { ConvexHttpClient } from 'convex/browser';
-import { getConvexUrl, getConvexClient } from '../internal/singleton.js';
+import { getConvexUrl, getConvexClient, _getServerToken } from '../internal/singleton.js';
 import { createDetachedQuery, type DetachedQueryResult } from './query-detached.svelte.js';
 import {
 	createDetachedPaginatedQuery,
@@ -81,8 +81,9 @@ export async function convexLoad<Query extends FunctionReference<'query'>>(
 	// Server-side: HTTP fetch, wrap in ConvexLoadResult for transport.
 	// transport.decode replaces this with a DetachedQueryResult on the client.
 	const httpClient = new ConvexHttpClient(getConvexUrl());
-	if (options?.token) {
-		httpClient.setAuth(options.token);
+	const token = options?.token ?? _getServerToken();
+	if (token) {
+		httpClient.setAuth(token);
 	}
 	const data = await httpClient.query(ref, args);
 	const name = getFunctionName(ref);
@@ -225,8 +226,9 @@ export async function convexLoadPaginated<Query extends FunctionReference<'query
 
 	// Server-side: HTTP fetch, wrap in marker class for transport
 	const httpClient = new ConvexHttpClient(getConvexUrl());
-	if (options.token) {
-		httpClient.setAuth(options.token);
+	const token = options.token ?? _getServerToken();
+	if (token) {
+		httpClient.setAuth(token);
 	}
 	const data = (await httpClient.query(ref, fullArgs)) as PaginatedReturnType<PageItem<Query>>;
 	const name = getFunctionName(ref);

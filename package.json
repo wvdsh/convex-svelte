@@ -57,6 +57,11 @@
 			"svelte": "./dist/sveltekit/index.js",
 			"import": "./dist/sveltekit/index.js",
 			"default": "./dist/sveltekit/index.js"
+		},
+		"./sveltekit/server": {
+			"types": "./dist/sveltekit/server-token.d.ts",
+			"import": "./dist/sveltekit/server-token.js",
+			"default": "./dist/sveltekit/server-token.js"
 		}
 	},
 	"peerDependencies": {

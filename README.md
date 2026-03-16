@@ -645,21 +645,38 @@ The result has the same shape as `usePaginatedQuery()` — `.results`, `.status`
 
 #### Authenticated fetches
 
-For authenticated server-side fetches, pass a token in the options:
+For authenticated SSR fetches, use `withServerConvexToken` in your server hook. This stores the auth token per-request via `AsyncLocalStorage`, so `convexLoad` and `createConvexHttpClient` pick it up automatically — no `{ token }` option needed.
 
 ```ts
-// convexLoad
+// hooks.server.ts
+import type { Handle } from '@sveltejs/kit';
+import { withServerConvexToken } from '@mmailaender/convex-svelte/sveltekit/server';
+
+export const handle: Handle = async ({ event, resolve }) => {
+	const token = await getAuthToken(event.cookies); // your auth provider
+	event.locals.token = token;
+	return withServerConvexToken(token, () => resolve(event));
+};
+```
+
+Then use `convexLoad` in **any** load function — `+page.ts` or `+page.server.ts`:
+
+```ts
+// +page.ts (universal) — works for both SSR and client-side navigation
+import { convexLoad } from '@mmailaender/convex-svelte/sveltekit';
+import { api } from '$convex/_generated/api';
+
+export const load = async () => ({
+	tasks: await convexLoad(api.tasks.get, {})
+});
+```
+
+The explicit `{ token }` option still works as a manual override:
+
+```ts
+// +page.server.ts — explicit token (escape hatch)
 export const load = async ({ locals }) => ({
 	tasks: await convexLoad(api.tasks.get, {}, { token: locals.token })
-});
-
-// convexLoadPaginated
-export const load = async ({ locals }) => ({
-	messages: await convexLoadPaginated(
-		api.messages.paginatedList,
-		{ muteWords: [] },
-		{ initialNumItems: 10, token: locals.token }
-	)
 });
 ```
 
@@ -705,19 +722,19 @@ Combining `initialData` with `keepPreviousData: true` (or never changing the que
 
 ### Server Helpers
 
-#### Setting up `locals.token`
+#### withServerConvexToken (recommended)
 
-To use authenticated Convex queries from server-side code, extract the auth token in a SvelteKit hook and make it available via `locals`:
+Import from `@mmailaender/convex-svelte/sveltekit/server`. Wraps your SvelteKit `resolve()` call to store the auth token per-request via `AsyncLocalStorage`. Both `convexLoad` and `createConvexHttpClient` automatically read it during SSR.
 
 ```ts
 // hooks.server.ts
 import type { Handle } from '@sveltejs/kit';
+import { withServerConvexToken } from '@mmailaender/convex-svelte/sveltekit/server';
 
 export const handle: Handle = async ({ event, resolve }) => {
-	// Replace with your auth provider's token extraction
-	event.locals.token = await getAuthToken(event.cookies);
-
-	return resolve(event);
+	const token = await getAuthToken(event.cookies);
+	event.locals.token = token; // still available for direct use
+	return withServerConvexToken(token, () => resolve(event));
 };
 ```
 
@@ -732,17 +749,44 @@ declare global {
 }
 ```
 
-With this setup, `event.locals.token` is available in all server load functions and form actions.
+With this setup, `convexLoad()` and `createConvexHttpClient()` automatically authenticate during SSR — no `{ token }` option needed in load functions.
+
+#### Setting up `locals.token` (without withServerConvexToken)
+
+If you prefer not to use `withServerConvexToken`, you can still extract the token and pass it explicitly:
+
+```ts
+// hooks.server.ts
+import type { Handle } from '@sveltejs/kit';
+
+export const handle: Handle = async ({ event, resolve }) => {
+	event.locals.token = await getAuthToken(event.cookies);
+	return resolve(event);
+};
+```
+
+Then pass `{ token: locals.token }` to `convexLoad` or `createConvexHttpClient` in each load function.
 
 #### createConvexHttpClient
 
 For server-only code (`+page.server.ts`, form actions, API routes), use `createConvexHttpClient()`:
 
 ```ts
-// +page.server.ts
+// +page.server.ts — with withServerConvexToken (no args needed)
 import { createConvexHttpClient } from '@mmailaender/convex-svelte/sveltekit';
 import { api } from '$convex/_generated/api';
 
+export const load = async () => {
+	const client = createConvexHttpClient();
+	const tasks = await client.query(api.tasks.get, {});
+	return { tasks };
+};
+```
+
+Explicit token still works as an override:
+
+```ts
+// +page.server.ts — explicit token (escape hatch)
 export const load = async ({ locals }) => {
 	const client = createConvexHttpClient({ token: locals.token });
 	const tasks = await client.query(api.tasks.get, {});
@@ -750,7 +794,7 @@ export const load = async ({ locals }) => {
 };
 ```
 
-The `url` option falls back to the URL set by `initConvex()`. Pass `token` for authenticated requests.
+The `url` option falls back to the URL set by `initConvex()`.
 
 ## Deploying
 

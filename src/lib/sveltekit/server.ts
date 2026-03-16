@@ -6,7 +6,7 @@
  * form actions, and server hooks.
  */
 import { ConvexHttpClient, type ConvexClientOptions } from 'convex/browser';
-import { getSingletonUrl } from '../internal/singleton.js';
+import { getSingletonUrl, _getServerToken } from '../internal/singleton.js';
 
 export type CreateConvexHttpClientOptions = {
 	/** Convex deployment URL. Falls back to the URL set by `initConvex()`. */
@@ -44,8 +44,9 @@ export function createConvexHttpClient(args: CreateConvexHttpClientOptions = {})
 		);
 	}
 	const client = new ConvexHttpClient(url, args.options);
-	if (args.token) {
-		client.setAuth(args.token);
+	const token = args.token ?? _getServerToken();
+	if (token) {
+		client.setAuth(token);
 	}
 	return client;
 }
